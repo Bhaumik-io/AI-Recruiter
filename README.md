@@ -1,98 +1,266 @@
-AI Recruiter — End-to-End Candidate Screening & Interview System
-An AI-powered recruitment pipeline: bulk resume screening, semantic ranking,
-personalized AI-generated interviews, and a combined final report — across
-two portals (HR and Candidate).
-Features
-Bulk resume upload (PDF, including scanned/image PDFs via OCR fallback)
-Semantic similarity ranking using sentence-transformer embeddings (not keyword matching)
-Chunked embedding comparison so long resumes aren't silently truncated
-Shortlisting workflow with auto-generated candidate interview links
-LLM-generated personalized interview questions per candidate
-Semantic answer scoring against AI-generated ideal answers
-Combined final report (resume score + interview score)
-Tech Stack
-Frontend: Streamlit (multipage app)
-Embeddings: sentence-transformers (`all-MiniLM-L6-v2`)
-LLM: OpenAI API (question generation)
-PDF parsing: pdfplumber + pytesseract/pdf2image (OCR fallback)
-Storage: JSON file (see "Production Notes" for scaling this up)
+# 🤖 AI Recruiter
+
+> An AI-powered recruitment platform that automates resume screening, candidate ranking, personalized interview generation, and AI-based interview evaluation.
+
+AI Recruiter helps HR teams streamline the hiring process by leveraging Artificial Intelligence to identify the best candidates through semantic resume analysis and personalized interviews.
+
 ---
-Local Setup
+
+# ✨ Features
+
+## 📄 Resume Screening
+
+- Upload multiple PDF resumes simultaneously
+- Automatic text extraction from resumes
+- OCR fallback for scanned or image-based PDFs
+- Semantic similarity matching against the Job Description
+- AI-generated candidate ranking with reasoning
+
+---
+
+## 👨‍💼 HR Dashboard
+
+- Upload resumes
+- Add Job Description
+- Rank candidates automatically
+- Shortlist candidates
+- Generate interview links
+- View final interview reports
+
+---
+
+## 👨‍🎓 Candidate Portal
+
+- Secure interview access through candidate-specific links
+- Personalized interview questions
+- Technical and behavioral interview rounds
+- Submit answers through the web portal
+- Receive AI-based interview evaluation
+
+---
+
+## 🤖 AI Interview System
+
+Using **Google Gemini**, the application:
+
+- Generates personalized interview questions
+- Creates ideal answers for evaluation
+- Scores candidate responses
+- Calculates an overall interview score
+
+---
+
+# 🛠 Technology Stack
+
+| Category | Technology |
+|-----------|------------|
+| Language | Python |
+| Frontend | Streamlit |
+| AI Model | Google Gemini API |
+| Resume Ranking | Sentence Transformers |
+| PDF Parsing | pdfplumber |
+| OCR | pytesseract + pdf2image |
+| Storage | JSON (MVP) |
+
+---
+
+# 📁 Project Structure
+
+```
+AI-Recruiter/
+│
+├── core/
+│   ├── answer_scoring.py
+│   ├── question_gen.py
+│   ├── ranking.py
+│   ├── resume_parser.py
+│   └── storage.py
+│
+├── data/
+│   └── candidates.json
+│
+├── pages/
+│   ├── 1_HR_Dashboard.py
+│   └── 2_Candidate_Portal.py
+│
+├── Home.py
+├── requirements.txt
+├── README.md
+└── .env.example
+```
+
+---
+
+# 🚀 Installation
+
+Clone the repository
+
 ```bash
-# 1. Clone/unzip this project, then:
-cd ai-recruiter-mvp
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+git clone https://github.com/Bhaumik-io/AI-Recruiter.git
+cd AI-Recruiter
+```
 
-# 2. Install dependencies
+Create a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Activate it
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+### Linux/macOS
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-# 3. Set your API key
-cp .env.example .env
-# then edit .env and paste your real OPENAI_API_KEY
+Create a `.env` file
 
-# 4. (Optional, for OCR support on scanned PDFs) Install system dependencies:
-#    - Tesseract OCR: https://github.com/UB-Mannheim/tesseract/wiki
-#    - Poppler: https://github.com/oschwartz10612/poppler-windows/releases
-#    Then set the paths in core/resume_parser.py (see comments in that file)
+```env
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
 
-# 5. Run
+Run the application
+
+```bash
 streamlit run Home.py
 ```
-Open the printed `localhost:8501` link. Use the HR Dashboard to upload
-resumes + a job description, rank and shortlist candidates, and generate
-interview links. Open a generated link in a new tab to test the Candidate
-Portal.
-Bulk Testing with a Real Dataset
-`load_kaggle_dataset.py` bulk-loads resumes directly from a labeled CSV
-dataset (e.g., Kaggle's "Resume Dataset" with `Resume_str`/`Category`
-columns), ranks them, and prints a validation comparison. Put your CSV at
-`data/Resume.csv` and run:
-```bash
-python load_kaggle_dataset.py
+
+---
+
+# 📝 OCR Support
+
+The application supports scanned or image-based PDF resumes using OCR.
+
+Install:
+
+- **Tesseract OCR**
+- **Poppler**
+
+After installation, update the paths inside:
+
 ```
-It will prompt you for a job description and target category directly in
-the terminal.
+core/resume_parser.py
+```
+
+If OCR is not installed, the application will still process standard text-based PDF resumes.
+
 ---
-Deployment (Streamlit Community Cloud — free)
-Push this project to a public or private GitHub repository
-Go to https://share.streamlit.io and sign in with GitHub
-Click "New app", select this repo, set the main file path to `Home.py`
-Under Advanced settings → Secrets, add:
-```toml
-   OPENAI_API_KEY = "sk-your-real-key-here"
-   ```
-(Streamlit Cloud uses `st.secrets` instead of a local `.env` file — see
-"Production Notes" below for the one code change this requires.)
-Deploy. You'll get a public URL like `https://your-app-name.streamlit.app`
-Note: Streamlit Community Cloud's free tier does not support installing
-system-level packages like Tesseract/Poppler, so the OCR fallback for
-scanned PDFs will not work on this free deployment — only text-based PDFs
-will parse correctly. This is fine for demo purposes; mention it as a known
-constraint of the free hosting tier.
+
+# 🔄 Application Workflow
+
+```
+Upload Resumes
+        │
+        ▼
+Resume Parsing
+        │
+        ▼
+OCR (if required)
+        │
+        ▼
+Semantic Resume Ranking
+        │
+        ▼
+Candidate Shortlisting
+        │
+        ▼
+Generate Interview Link
+        │
+        ▼
+Candidate Interview
+        │
+        ▼
+Gemini Answer Evaluation
+        │
+        ▼
+Final Hiring Report
+```
+
 ---
-Production Notes (what an industry-grade version would add)
-This project is built as a working proof-of-concept. To honestly call it
-production/industry-ready, the following would need to be added — listed
-here so you can speak to this directly in a report or interview:
-Area	Current (MVP)	Production-grade
-Storage	JSON file	PostgreSQL/MySQL with proper schema, indexing
-Auth	None (URL-based candidate ID)	Real login (OAuth/JWT) for HR and candidates
-Secrets	`.env` file	Secrets manager (AWS Secrets Manager, Streamlit Secrets, etc.)
-Bias handling	None	Mask name/gender/college before scoring
-Interview logic	Fixed 5 questions	Adaptive follow-up based on answer quality
-Scale	Single JSON file, single process	Async task queue for bulk ranking (Celery/RQ), proper API backend
-Deployment	Streamlit Cloud (free tier)	Containerized (Docker) on a cloud provider with CI/CD
-Monitoring	None	Logging, error tracking (Sentry), usage analytics
-Being able to name this gap clearly is itself a strong signal in a viva —
-it shows you understand the difference between a working prototype and a
-deployable product.
-Known Limitations
-OCR fallback requires local Tesseract/Poppler install; not available on
-free-tier cloud hosting
-No authentication — anyone with a candidate link can access that
-candidate's interview
-JSON file storage is fine for small-scale testing but not concurrent
-multi-user production use
-Ranking accuracy depends on resume text quality; heavily templated or
-very short resumes may score lower even if genuinely relevant
+
+# 📸 Screenshots
+
+> Screenshots will be added in a future update.
+
+Recommended screenshots:
+
+- Home Page
+- HR Dashboard
+- Candidate Portal
+- Final Report
+
+---
+
+# 📊 Current Project Status
+
+This repository represents **Version 1.0 (MVP)**.
+
+The MVP demonstrates the complete AI-powered recruitment workflow, including:
+
+- Resume parsing
+- AI resume ranking
+- Candidate shortlisting
+- AI-generated interviews
+- AI answer evaluation
+
+---
+
+# 🚧 Roadmap (Version 2.0)
+
+The next version will introduce:
+
+- JWT Authentication
+- HR / Candidate / Admin Login
+- PostgreSQL Database
+- Docker Support
+- FastAPI Backend
+- React Frontend
+- Voice-based Interviews
+- Speech-to-Text Evaluation
+- Webcam Proctoring
+- Anti-Cheating Detection
+- Email Notifications
+- Analytics Dashboard
+- Cloud Deployment
+- CI/CD Pipeline
+
+---
+
+# ⚠ Known Limitations
+
+As this is an MVP:
+
+- Uses JSON storage instead of a database
+- No authentication
+- Candidate access is link-based
+- OCR requires local installation of Tesseract and Poppler
+- No interview scheduling
+- No voice interview support
+- No webcam monitoring
+
+---
+
+# 👨‍💻 Author
+
+**Bhaumik**
+
+AI Recruiter is an ongoing project focused on building an industry-ready AI-powered recruitment platform using modern AI technologies.
+
+---
+
+# ⭐ Support
+
+If you found this project helpful, consider giving it a ⭐ on GitHub.
