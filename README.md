@@ -1,70 +1,59 @@
-# 🤖 AI Recruiter
+# AI Recruiter
 
-> An AI-powered recruitment platform that automates resume screening, candidate ranking, personalized interview generation, and AI-based interview evaluation.
+AI Recruiter is an AI-powered recruitment system developed to simplify the hiring process. The application helps HR professionals screen resumes, rank candidates according to a job description, generate personalized interview questions, and evaluate interview responses using Artificial Intelligence.
 
-AI Recruiter helps HR teams streamline the hiring process by leveraging Artificial Intelligence to identify the best candidates through semantic resume analysis and personalized interviews.
-
----
-
-# ✨ Features
-
-## 📄 Resume Screening
-
-- Upload multiple PDF resumes simultaneously
-- Automatic text extraction from resumes
-- OCR fallback for scanned or image-based PDFs
-- Semantic similarity matching against the Job Description
-- AI-generated candidate ranking with reasoning
+The project is developed as a proof-of-concept to demonstrate how AI can assist different stages of the recruitment process.
 
 ---
 
-## 👨‍💼 HR Dashboard
+## Features
 
+### Resume Screening
+- Upload multiple candidate resumes (PDF)
+- Automatic resume text extraction
+- OCR support for scanned or image-based PDFs
+- Semantic resume ranking based on the Job Description
+- Resume match score with ranking explanation
+
+### HR Dashboard
 - Upload resumes
-- Add Job Description
+- Enter Job Description
 - Rank candidates automatically
 - Shortlist candidates
 - Generate interview links
-- View final interview reports
+- View final interview results
 
----
-
-## 👨‍🎓 Candidate Portal
-
-- Secure interview access through candidate-specific links
+### Candidate Portal
+- Candidate-specific interview link
 - Personalized interview questions
-- Technical and behavioral interview rounds
-- Submit answers through the web portal
-- Receive AI-based interview evaluation
+- Technical and behavioral questions
+- Submit interview answers
+- AI-based interview evaluation
+
+### AI Interview Evaluation
+- Personalized question generation using Google Gemini
+- AI-generated ideal answers
+- Candidate answer scoring
+- Overall interview score generation
 
 ---
 
-## 🤖 AI Interview System
+# Technologies Used
 
-Using **Google Gemini**, the application:
-
-- Generates personalized interview questions
-- Creates ideal answers for evaluation
-- Scores candidate responses
-- Calculates an overall interview score
-
----
-
-# 🛠 Technology Stack
-
-| Category | Technology |
-|-----------|------------|
-| Language | Python |
-| Frontend | Streamlit |
-| AI Model | Google Gemini API |
-| Resume Ranking | Sentence Transformers |
-| PDF Parsing | pdfplumber |
-| OCR | pytesseract + pdf2image |
-| Storage | JSON (MVP) |
+| Technology | Purpose |
+|------------|---------|
+| Python | Programming Language |
+| Streamlit | Web Application |
+| Google Gemini API | Question Generation and Answer Evaluation |
+| Sentence Transformers | Resume Ranking |
+| pdfplumber | PDF Text Extraction |
+| pytesseract | OCR |
+| pdf2image | Image Conversion for OCR |
+| JSON | Data Storage (MVP) |
 
 ---
 
-# 📁 Project Structure
+# Project Structure
 
 ```
 AI-Recruiter/
@@ -91,22 +80,24 @@ AI-Recruiter/
 
 ---
 
-# 🚀 Installation
+# Installation
 
-Clone the repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Bhaumik-io/AI-Recruiter.git
 cd AI-Recruiter
 ```
 
-Create a virtual environment
+---
+
+## 2. Create a Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate it
+Activate the environment.
 
 ### Windows
 
@@ -114,153 +105,139 @@ Activate it
 .venv\Scripts\activate
 ```
 
-### Linux/macOS
+### Linux / macOS
 
 ```bash
 source .venv/bin/activate
 ```
 
-Install dependencies
+---
+
+## 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Create a `.env` file
+---
+
+## 4. Configure the Gemini API Key
+
+Create a `.env` file in the project folder.
+
+Example:
 
 ```env
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
-Run the application
+---
+
+## 5. Run the Application
 
 ```bash
 streamlit run Home.py
 ```
 
+Open the local URL displayed in the terminal.
+
 ---
 
-# 📝 OCR Support
+# OCR Support
 
 The application supports scanned or image-based PDF resumes using OCR.
 
-Install:
+To enable OCR:
 
-- **Tesseract OCR**
-- **Poppler**
+- Install Tesseract OCR
+- Install Poppler
 
-After installation, update the paths inside:
+After installation, configure the paths inside:
 
 ```
 core/resume_parser.py
 ```
 
-If OCR is not installed, the application will still process standard text-based PDF resumes.
+If OCR is not installed, the application will still process normal text-based PDF resumes.
 
 ---
 
-# 🔄 Application Workflow
+# Application Workflow
 
 ```
+HR Dashboard
+      │
+      ▼
 Upload Resumes
-        │
-        ▼
+      │
+      ▼
 Resume Parsing
-        │
-        ▼
+      │
+      ▼
 OCR (if required)
-        │
-        ▼
-Semantic Resume Ranking
-        │
-        ▼
+      │
+      ▼
+Resume Ranking
+      │
+      ▼
 Candidate Shortlisting
-        │
-        ▼
+      │
+      ▼
 Generate Interview Link
-        │
-        ▼
-Candidate Interview
-        │
-        ▼
-Gemini Answer Evaluation
-        │
-        ▼
-Final Hiring Report
+      │
+      ▼
+Candidate Portal
+      │
+      ▼
+Generate Interview Questions
+      │
+      ▼
+Candidate Answers
+      │
+      ▼
+AI Answer Evaluation
+      │
+      ▼
+Final Report
 ```
 
 ---
 
-# 📸 Screenshots
+# Current Limitations
 
-> Screenshots will be added in a future update.
+This project is currently implemented as a Minimum Viable Product (MVP).
 
-Recommended screenshots:
+Some current limitations are:
 
-- Home Page
-- HR Dashboard
-- Candidate Portal
-- Final Report
-
----
-
-# 📊 Current Project Status
-
-This repository represents **Version 1.0 (MVP)**.
-
-The MVP demonstrates the complete AI-powered recruitment workflow, including:
-
-- Resume parsing
-- AI resume ranking
-- Candidate shortlisting
-- AI-generated interviews
-- AI answer evaluation
+- JSON is used instead of a database.
+- Authentication has not been implemented.
+- Candidate access is based on interview links.
+- OCR requires local installation of Tesseract and Poppler.
+- Voice interviews are not supported.
+- Webcam monitoring and anti-cheating features are not implemented.
 
 ---
 
-# 🚧 Roadmap (Version 2.0)
+# Future Improvements
 
-The next version will introduce:
+Some features planned for future development include:
 
-- JWT Authentication
-- HR / Candidate / Admin Login
+- User Authentication
+- HR, Candidate and Admin Accounts
 - PostgreSQL Database
 - Docker Support
-- FastAPI Backend
-- React Frontend
-- Voice-based Interviews
-- Speech-to-Text Evaluation
+- Voice-based Interview
+- Speech-to-Text
+- Interview Scheduling
+- Email Notifications
 - Webcam Proctoring
 - Anti-Cheating Detection
-- Email Notifications
-- Analytics Dashboard
 - Cloud Deployment
-- CI/CD Pipeline
 
 ---
 
-# ⚠ Known Limitations
+# Author
 
-As this is an MVP:
+**Bhaumik Kumar**
 
-- Uses JSON storage instead of a database
-- No authentication
-- Candidate access is link-based
-- OCR requires local installation of Tesseract and Poppler
-- No interview scheduling
-- No voice interview support
-- No webcam monitoring
-
----
-
-# 👨‍💻 Author
-
-**Bhaumik**
-
-AI Recruiter is an ongoing project focused on building an industry-ready AI-powered recruitment platform using modern AI technologies.
-
----
-
-# ⭐ Support
-
-If you found this project helpful, consider giving it a ⭐ on GitHub.
+Major Project 
