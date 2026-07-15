@@ -1,59 +1,43 @@
 # AI Recruiter
 
-AI Recruiter is an AI-powered recruitment system developed to simplify the hiring process. The application helps HR professionals screen resumes, rank candidates according to a job description, generate personalized interview questions, and evaluate interview responses using Artificial Intelligence.
+AI Recruiter is a recruitment assistance platform developed to simplify the initial hiring process. It helps HR professionals screen resumes, rank candidates based on job requirements, conduct AI-generated interviews, and evaluate candidate responses automatically.
 
-The project is developed as a proof-of-concept to demonstrate how AI can assist different stages of the recruitment process.
+The project was developed using Streamlit as the frontend framework, Google's Gemini API for AI-powered interview generation and answer evaluation, and sentence-transformer embeddings for semantic resume ranking.
+
+> **Current Status:** MVP (Minimum Viable Product)
 
 ---
 
 ## Features
 
-### Resume Screening
-- Upload multiple candidate resumes (PDF)
-- Automatic resume text extraction
-- OCR support for scanned or image-based PDFs
-- Semantic resume ranking based on the Job Description
-- Resume match score with ranking explanation
-
-### HR Dashboard
-- Upload resumes
-- Enter Job Description
-- Rank candidates automatically
-- Shortlist candidates
-- Generate interview links
-- View final interview results
-
-### Candidate Portal
-- Candidate-specific interview link
-- Personalized interview questions
-- Technical and behavioral questions
-- Submit interview answers
-- AI-based interview evaluation
-
-### AI Interview Evaluation
-- Personalized question generation using Google Gemini
-- AI-generated ideal answers
-- Candidate answer scoring
-- Overall interview score generation
+- Upload multiple resumes in PDF format
+- Extract text from both normal and scanned PDFs (OCR supported)
+- Match resumes against a Job Description using semantic similarity
+- Rank candidates based on resume relevance
+- Shortlist candidates from the HR dashboard
+- Generate interview links for shortlisted candidates
+- Generate personalized interview questions using Google Gemini
+- Evaluate candidate answers using AI
+- Generate interview scores automatically
+- Display a final report combining resume and interview performance
 
 ---
 
-# Technologies Used
+## Technology Stack
 
-| Technology | Purpose |
-|------------|---------|
-| Python | Programming Language |
-| Streamlit | Web Application |
-| Google Gemini API | Question Generation and Answer Evaluation |
-| Sentence Transformers | Resume Ranking |
-| pdfplumber | PDF Text Extraction |
-| pytesseract | OCR |
-| pdf2image | Image Conversion for OCR |
-| JSON | Data Storage (MVP) |
+| Component | Technology |
+|------------|------------|
+| Frontend | Streamlit |
+| AI Model | Google Gemini API |
+| Resume Ranking | Sentence Transformers (all-MiniLM-L6-v2) |
+| PDF Parsing | pdfplumber |
+| OCR | pytesseract + pdf2image |
+| Storage | JSON (MVP) |
+| Language | Python |
 
 ---
 
-# Project Structure
+## Project Structure
 
 ```
 AI-Recruiter/
@@ -74,46 +58,69 @@ AI-Recruiter/
 │
 ├── Home.py
 ├── requirements.txt
-├── README.md
-└── .env.example
+├── .env.example
+└── README.md
 ```
 
 ---
 
-# Installation
+## How the System Works
 
-## 1. Clone the Repository
+### HR Dashboard
+
+1. Upload one or more resumes.
+2. Paste the Job Description.
+3. The system extracts resume content.
+4. Each resume is compared with the Job Description.
+5. Candidates are ranked according to their relevance.
+6. HR shortlists suitable candidates.
+7. Interview links are generated.
+
+### Candidate Portal
+
+1. Candidate opens the interview link.
+2. AI generates interview questions based on the resume and job description.
+3. Candidate answers the questions.
+4. Gemini evaluates the responses.
+5. The interview score is stored and shown to HR.
+
+---
+
+## Installation
+
+Clone the repository
 
 ```bash
 git clone https://github.com/Bhaumik-io/AI-Recruiter.git
+```
+
+Move into the project folder
+
+```bash
 cd AI-Recruiter
 ```
 
----
-
-## 2. Create a Virtual Environment
+Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate the environment.
+Activate the virtual environment
 
-### Windows
+Windows
 
 ```bash
 .venv\Scripts\activate
 ```
 
-### Linux / macOS
+Linux / macOS
 
 ```bash
 source .venv/bin/activate
 ```
 
----
-
-## 3. Install Dependencies
+Install the required packages
 
 ```bash
 pip install -r requirements.txt
@@ -121,123 +128,89 @@ pip install -r requirements.txt
 
 ---
 
-## 4. Configure the Gemini API Key
+## Gemini API Setup
 
-Create a `.env` file in the project folder.
+Create a `.env` file in the project directory.
 
-Example:
+Add your Gemini API key.
 
 ```env
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_API_KEY=YOUR_API_KEY
 ```
 
 ---
 
-## 5. Run the Application
+## Running the Project
+
+Start the Streamlit application.
 
 ```bash
 streamlit run Home.py
 ```
 
-Open the local URL displayed in the terminal.
+The application will open in your browser.
 
 ---
 
-# OCR Support
+## OCR Support
 
-The application supports scanned or image-based PDF resumes using OCR.
+The project also supports scanned PDF resumes using OCR.
 
-To enable OCR:
+To enable OCR, install:
 
-- Install Tesseract OCR
-- Install Poppler
+- Tesseract OCR
+- Poppler
 
-After installation, configure the paths inside:
+After installation, configure their paths inside `core/resume_parser.py`.
 
-```
-core/resume_parser.py
-```
-
-If OCR is not installed, the application will still process normal text-based PDF resumes.
+If OCR is not installed, the application will still work normally for text-based PDF resumes.
 
 ---
 
-# Application Workflow
+## Current Limitations
 
-```
-HR Dashboard
-      │
-      ▼
-Upload Resumes
-      │
-      ▼
-Resume Parsing
-      │
-      ▼
-OCR (if required)
-      │
-      ▼
-Resume Ranking
-      │
-      ▼
-Candidate Shortlisting
-      │
-      ▼
-Generate Interview Link
-      │
-      ▼
-Candidate Portal
-      │
-      ▼
-Generate Interview Questions
-      │
-      ▼
-Candidate Answers
-      │
-      ▼
-AI Answer Evaluation
-      │
-      ▼
-Final Report
-```
+This project is currently developed as a Minimum Viable Product (MVP). Some limitations are:
+
+- JSON is used instead of a relational database.
+- Authentication has not been implemented yet.
+- Candidate interview links are URL-based.
+- AI response time depends on Gemini API availability.
+- Free deployment platforms may not support OCR because of missing system dependencies.
 
 ---
 
-# Current Limitations
+## Future Improvements
 
-This project is currently implemented as a Minimum Viable Product (MVP).
+The following features are planned for future versions:
 
-Some current limitations are:
-
-- JSON is used instead of a database.
-- Authentication has not been implemented.
-- Candidate access is based on interview links.
-- OCR requires local installation of Tesseract and Poppler.
-- Voice interviews are not supported.
-- Webcam monitoring and anti-cheating features are not implemented.
-
----
-
-# Future Improvements
-
-Some features planned for future development include:
-
-- User Authentication
-- HR, Candidate and Admin Accounts
-- PostgreSQL Database
-- Docker Support
-- Voice-based Interview
-- Speech-to-Text
-- Interview Scheduling
-- Email Notifications
-- Webcam Proctoring
-- Anti-Cheating Detection
-- Cloud Deployment
+- HR and Candidate authentication
+- PostgreSQL or MySQL integration
+- Docker support
+- Cloud deployment
+- Email notifications
+- Voice-based interviews
+- Webcam monitoring during interviews
+- Anti-cheating mechanisms
+- Resume history and analytics
+- Admin dashboard
+- Candidate performance reports
 
 ---
 
-# Author
+## Screenshots
 
-**Bhaumik Kumar**
+Screenshots of the HR Dashboard and Candidate Portal will be added after the UI redesign.
 
-Major Project 
+---
+
+## Author
+
+**Bhaumik**
+
+Developed as part of an AI-based recruitment system project.
+
+---
+
+## License
+
+This project is intended for educational and learning purposes.
