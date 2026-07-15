@@ -1,0 +1,5 @@
+streamlit
+pdfplumber
+sentence-transformers
+python-dotenv
+pandas
