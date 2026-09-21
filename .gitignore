@@ -1,0 +1,38 @@
+# --- Secrets — never commit these ---
+.env
+backend/.env
+frontend/.env
+*.pem
+
+# --- Python / backend ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+backend/venv/
+backend/.venv/
+*.egg-info/
+.pytest_cache/
+
+# --- Node / frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# --- Data / uploads (don't commit local test data) ---
+backend/data/*.db
+backend/data/uploads/
+
+# --- JetBrains / editor ---
+.idea/
+/shelf/
+/workspace.xml
+/httpRequests/
+.vscode/
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db

@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/*
+ * "Executive credential" palette — deep ink-navy surfaces with a warm
+ * brass accent, standing in for the generic indigo-on-slate SaaS default.
+ * We remap Tailwind's own `slate` and `indigo` scales here rather than
+ * touching every page file: every bg-slate-950 / text-slate-400 /
+ * bg-indigo-600 / ring-indigo-500 already used across the app picks up
+ * the new palette automatically. `cyan` is remapped too — it was only
+ * ever used for the candidate-portal accent on the landing page.
+ */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Source Serif 4', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* slate -> ink navy (neutrals: backgrounds, borders, body text) */
+  --color-slate-950: #0a0d13;
+  --color-slate-900: #12161f;
+  --color-slate-800: #1b212d;
+  --color-slate-700: #2a3140;
+  --color-slate-600: #3c4456;
+  --color-slate-500: #5a6478;
+  --color-slate-400: #8991a5;
+  --color-slate-300: #aeb5c5;
+  --color-slate-200: #d2d6e1;
+  --color-slate-100: #e9ebf1;
+  --color-slate-50:  #f5f6f9;
+
+  /* indigo -> brass (primary accent) */
+  --color-indigo-950: #241c0c;
+  --color-indigo-900: #3a2d13;
+  --color-indigo-800: #5c481c;
+  --color-indigo-700: #83672a;
+  --color-indigo-600: #a9823a;
+  --color-indigo-500: #c6a154;
+  --color-indigo-400: #d7ba79;
+  --color-indigo-300: #e4cfa0;
+  --color-indigo-200: #efe1c1;
+
+  /* cyan -> muted ink-teal (candidate-portal secondary accent) */
+  --color-cyan-700: #2f5754;
+  --color-cyan-600: #3c6b68;
+  --color-cyan-500: #4f8681;
+  --color-cyan-400: #6fa39d;
+  --color-cyan-300: #97bfba;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+}
+
+/*
+ * A page opened from an email link, a bookmark, or a fresh browser
+ * window can land in almost any window size — that's decided by the
+ * browser/OS, not by this app (no webpage can force-resize or
+ * force-maximize the browser window itself). What IS in our control is
+ * making sure the content always properly fills whatever size it's
+ * given, instead of looking cramped or leaving odd gaps.
+ *
+ * `min-h-screen` (Tailwind's 100vh) is used across every full-page
+ * layout (Landing, HRLogin, CandidateLogin, CandidateInterview,
+ * ConferenceRoom). 100vh can be slightly wrong on some browsers/window
+ * managers — this override swaps it to 100dvh (dynamic viewport
+ * height), which tracks the ACTUAL visible area, everywhere that class
+ * is used, without editing every page individually.
+ */
+.min-h-screen {
+  min-height: 100dvh;
+}
+
+body, #root {
+  min-height: 100dvh;
+  width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  @apply bg-slate-950 text-slate-100;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-slate-700); border-radius: 8px; }
+
+:focus-visible {
+  outline: 2px solid var(--color-indigo-500);
+  outline-offset: 2px;
+}
+
+.input {
+  @apply w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-indigo-500/70 transition;
+}
+
+/* Small uppercase label used above a page/section title — the app's one
+   consistent structural signature, echoing a letterhead eyebrow line. */
+.eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-400/90;
+}
+
+.hairline {
+  @apply border-t border-slate-800;
+}

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: ai-recruiter-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: ai_recruiter
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: MAIL_ENABLED
+        value: "true"
+      - key: HR_QUICK_LOGIN_ENABLED
+        value: "false"
