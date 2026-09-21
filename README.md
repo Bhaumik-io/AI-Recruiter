@@ -1,6 +1,8 @@
 # AI Recruiter v2 — FastAPI + React
 
-This is your original Streamlit MVP's `core/` logic (resume parsing,
+> The original MVP (Streamlit version) lives on the [`v1` branch](https://github.com/Bhaumik-io/AI-Recruiter/tree/v1).
+
+This is original Streamlit MVP's `core/` logic (resume parsing,
 ranking, question generation, answer scoring) re-wired behind a FastAPI
 backend, with a new React frontend and four new features: HR/candidate
 auth, face-authentication login, an anti-cheat/proctoring monitor, and
