@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { hrApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Card from '../components/Card'
@@ -128,6 +129,15 @@ export default function HRDashboard() {
             className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
             {label}
           </a>
+        ))}
+        {[
+            ['/hr/exam-module', 'Exam module'],
+            ['/hr/question-gen', 'Question gen'],
+        ].map(([to, label]) => (
+          <Link key={to} to={to}
+            className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">
+            {label}
+          </Link>
         ))}
       </nav>
 

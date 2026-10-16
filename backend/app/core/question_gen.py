@@ -30,8 +30,7 @@ def get_api_key() -> str:
         return None
 
 
-MODEL_NAME = "gemini-3.1-flash-lite"
-
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 _client = None
 
 

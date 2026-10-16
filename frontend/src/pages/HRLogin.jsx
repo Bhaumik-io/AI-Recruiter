@@ -64,12 +64,12 @@ export default function HRLogin() {
             {busy ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Sign up'}
           </button>
         </form>
-        <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+        {/*<button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
           className="text-sm text-slate-400 hover:text-slate-200 mt-4">
           {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
-        </button>
+        </button>*/}
 
-        <div className="flex items-center gap-2 my-4">
+        {/*<div className="flex items-center gap-2 my-4">
           <div className="h-px bg-slate-700 flex-1" />
           <span className="text-xs text-slate-500">or</span>
           <div className="h-px bg-slate-700 flex-1" />
@@ -81,7 +81,7 @@ export default function HRLogin() {
         </button>
         <p className="text-xs text-slate-500 mt-2 text-center">
           Instant temp account — no signup needed. For demos/testing only.
-        </p>
+        </p>*/}
       </Card>
     </div>
   )

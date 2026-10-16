@@ -10,6 +10,7 @@ everything after that point. To fix this, we split each resume into chunks,
 embed each chunk separately, and take the BEST-matching chunk's score. This
 way relevant experience buried later in a resume still gets captured.
 """
+import os
 
 from sentence_transformers import SentenceTransformer, util
 
@@ -25,14 +26,20 @@ _model = None
 
 def get_model():
     """
-    Load the embedding model once and reuse it. Caches in memory (module-level
-    global) so repeated calls within the same process are instant regardless
-    of Streamlit reruns — this is the fix for perceived slowness.
+    Load the embedding model once and reuse it.
+    Cache it in memory so repeated calls don't reload it.
     """
     global _model
+
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        model_name = os.getenv(
+            "RANKING_EMBEDDING_MODEL",
+            "all-MiniLM-L6-v2",
+        )
+        _model = SentenceTransformer(model_name)
     return _model
+
+
 
 
 if IN_STREAMLIT:

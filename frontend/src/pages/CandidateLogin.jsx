@@ -12,13 +12,14 @@ import FaceAuth from '../components/FaceAuth'
 // hands back a real, usable candidate token. Neither password nor
 // face alone is enough.
 export default function CandidateLogin() {
-  const [mode, setMode] = useState(() => localStorage.getItem('candidateAuthMode') || 'login') // 'login' | 'signup'
+  const [mode, setMode] = useState(() => localStorage.getItem('candidateAuthMode') || 'signup') // 'login' | 'signup' — opens on Sign up by default
   const [step, setStep] = useState(() =>
     localStorage.getItem('candidate_role') === 'candidate_pre_auth' && localStorage.getItem('candidatePreAuthId')
       ? 'face' : 'password'
   )
   const [form, setForm] = useState({ email: '', password: '', candidate_id: '' })
   const [candidateId, setCandidateId] = useState(() => localStorage.getItem('candidatePreAuthId') || '')
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const { loginCandidate } = useAuth()
@@ -27,6 +28,10 @@ export default function CandidateLogin() {
   async function submitPassword(e) {
     e.preventDefault()
     setError('')
+    if (mode === 'signup' && !consent) {
+      setError('You must agree to camera, face and screen monitoring to continue.')
+      return
+    }
     setBusy(true)
     try {
       const path = mode === 'signup' ? '/auth/candidate/signup' : '/auth/candidate/login'
@@ -51,7 +56,8 @@ export default function CandidateLogin() {
     localStorage.removeItem('candidatePreAuthId')
     localStorage.removeItem('candidateAuthMode')
     loginCandidate(data.token, 'candidate', data.candidate_id)
-    navigate('/candidate/interview')
+    // MST students (id starts with INV_) go to the exam; resume candidates keep the interview.
+    navigate(String(data.candidate_id || '').startsWith('INV_') ? '/candidate/exam' : '/candidate/interview')
   }
 
   function goBackToPassword() {
@@ -111,15 +117,23 @@ export default function CandidateLogin() {
 
         <form onSubmit={submitPassword} className="space-y-3">
           {mode === 'signup' && (
-            <input className="input" placeholder="Candidate ID (ask HR / check your mail)" required
+            <input className="input" placeholder="Access code (from your email / SMS) or Candidate ID" required
               value={form.candidate_id} onChange={(e) => setForm({ ...form, candidate_id: e.target.value })} />
           )}
           <input className="input" type="email" placeholder="Email" required value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <input className="input" type="password" placeholder="New Password" required value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })} />
+
+          {mode === 'signup' && (
+            <label className="flex gap-2 items-start text-xs text-slate-400 bg-slate-800/50 p-2 rounded">
+              <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} required className="mt-0.5" />
+              <span>I agree to camera, face and screen monitoring during the exam. My data will be used only for proctoring and evaluation and can be deleted on request to HR.</span>
+            </label>
+          )}
+
           {error && <p className="text-red-400 text-sm">{error}</p>}
-          <button disabled={busy} className="w-full py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-medium disabled:opacity-40">
+          <button disabled={busy || (mode === 'signup' && !consent)} className="w-full py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-medium disabled:opacity-40">
             {busy ? 'Please wait...' : mode === 'signup' ? 'Continue to face enrollment →' : 'Continue to face verification →'}
           </button>
         </form>

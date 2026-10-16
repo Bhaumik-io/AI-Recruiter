@@ -1,179 +1,135 @@
-# AI Recruiter v2 — FastAPI + React
+# AI Recruiter V3 — Exam + Interview Suite
 
-> The original MVP (Streamlit version) lives on the [`v1` branch](https://github.com/Bhaumik-io/AI-Recruiter/tree/v1).
+A hiring and examination platform: HR ranks resumes and runs proctored AI
+interviews, and teachers run proctored MST-style exams for a whole class from
+one syllabus. FastAPI + React, MongoDB Atlas, Gemini, and in-browser face
+recognition.
 
-This is original Streamlit MVP's `core/` logic (resume parsing,
-ranking, question generation, answer scoring) re-wired behind a FastAPI
-backend, with a new React frontend and four new features: HR/candidate
-auth, face-authentication login, an anti-cheat/proctoring monitor, and
-AI-generated candidate feedback.
+> History: the original Streamlit MVP is on the [`v1` branch](https://github.com/Bhaumik-io/AI-Recruiter/tree/v1).
+> V2 added the FastAPI + React rebuild, face login and anti-cheat. **V3 adds the Exam suite.**
 
 ```
-ai_recruiter_v2/
-├── backend/     FastAPI app — reuses your original core/*.py almost unchanged
-└── frontend/    React + Vite + Tailwind — replaces the Streamlit UI
+ai_recruiter/
+├── backend/     FastAPI app (routers, Gemini services, MongoDB storage)
+└── frontend/    React + Vite + Tailwind (HR dashboard, candidate and exam pages)
 ```
 
-## Why this split (read this before changing architecture)
+## What it does
 
-Streamlit reruns the whole page top-to-bottom on every interaction and
-has no clean way to hold a persistent webcam stream or push real-time
-events — both of which face-auth and anti-cheat need. Splitting into a
-stateless REST API (FastAPI) + a stateful browser client (React) is
-the standard fix and is what makes deployment predictable later: the
-backend can scale independently, and the frontend can be hosted as
-static files on a CDN.
+### Interview suite (HR → candidate)
+- Upload resumes + a job description; candidates are parsed and ranked.
+- Shortlist, then invite by email. Candidates sign up with their ID and enrol their face.
+- Gemini-generated interview questions and answer scoring, plus AI feedback for each candidate.
+- Live proctoring during the interview (see *Proctoring* below).
+- Video conference scheduling with email notifications.
 
-Your resume-ranking, question-generation, and answer-scoring logic
-(the actual hard part of this project) is unchanged — it was just
-lifted out of Streamlit pages into REST endpoints.
+### Exam suite (teacher → whole class)
+1. **Question paper generator.** Upload a syllabus (PDF or photos). Gemini detects chapters and topics. Type which
+   chapters ("go with 6 and 7"), pick the style — *Default* (theory), *Application* (scenario) or *+ More* (write
+   your own prompt) — and the type: MCQ, fill in the blanks, questions or a mix. Preview, edit and approve.
+2. **Exam module.** Upload a student list (.csv / .xlsx). Emails and phone numbers are extracted automatically. Send
+   each student a one-time access code by email (or SMS) with one click.
+3. **Time window.** Set when the exam opens and closes. The server enforces it: the paper stays hidden until the start
+   time, and everyone is auto-submitted at the end.
+4. **Students** sign up with their code at one shared link (`/candidate/login`), enrol their face, then take the exam.
+5. **Marking.** MCQs are marked instantly in code; fill-ins and written answers are marked by Gemini against model
+   answers. Reports show scores, answers and the proctoring log per student. HR can rescore, reset a device,
+   delete a paper or clear history. The latest 10 papers are kept automatically.
 
----
+### Proctoring and anti-cheat
+- Mandatory entire-screen share and fullscreen.
+- **System check before the exam:** camera working, exactly one clear face, and the face matches the sign-up photo.
+  Checked again on the server before the paper is released.
+- During the exam: face re-check about once a minute, tab/window switching, looking away, extra faces, copy-paste,
+  dev-tools, leaving fullscreen, stopped screen share. Three strikes end the exam and submit the answers so far.
+- Camera lost → a blocking overlay until it is restored.
+- One device per student, one open exam window at a time, strong passwords, rate-limited login.
+- Answers auto-save every 5 seconds, so a crash or reload loses almost nothing.
+- Only the face-match numbers and warning events are stored. Video and screen content are never uploaded.
 
-## 1. Local setup
+> Browser-based proctoring cannot be made airtight (a second device or a person off camera can still help a
+> student). Treat flags as evidence for a teacher to review, and run exams with an invigilator in the room.
 
-### Backend
+## Local setup
 
+**Backend**
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m venv venv
+venv\Scripts\activate            # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env             # then fill in GEMINI_API_KEY, JWT_SECRET, MONGO_URI
+cp .env.example .env             # then fill it in (table below)
 uvicorn app.main:app --reload --port 8000
 ```
 
-Visit `http://localhost:8000/docs` to see every endpoint and try them
-interactively (this is FastAPI's auto-generated Swagger UI — a big
-upgrade over the old MVP's total lack of an API contract).
-
-**Storage:** this now runs on MongoDB, not SQLite — `app/core/storage.py`
-was rewritten to talk to Mongo (every function kept the same name/signature,
-so nothing in `routers/*.py` had to change). Set `MONGO_URI` in `.env`; it
-defaults to `mongodb://localhost:27017` for a local Mongo instance, or point
-it at a MongoDB Atlas free-tier connection string for cloud storage. There's
-no `data/*.db` file to manage anymore.
-
-**OCR note:** scanned/image PDFs still need Tesseract + Poppler
-installed system-side, same as before — see `backend/Dockerfile` for
-the exact packages if you want it working in a container.
-
-**Dev-only reset endpoint:** `POST /dev/reset-all` wipes every collection
-(candidates, HR users, candidate auth, feedback, proctoring events,
-settings) in one call, so you can re-run the whole flow from scratch
-without touching Mongo by hand. It's intentionally unauthenticated so it
-can be called from logged-out screens too — **remove the `dev_router`
-`include_router()` call in `app/main.py` before deploying for real.**
-
-### Frontend
-
+**Frontend**
 ```bash
 cd frontend
 npm install
-cp .env.example .env      # VITE_API_URL=http://localhost:8000
-npm run dev
+cp .env.example .env             # VITE_API_URL=http://localhost:8000
+npm run dev                      # http://localhost:5173
 ```
+The face model files live in `frontend/public/models/` (commit them).
 
-The face-api.js model weights are already committed under
-`frontend/public/models/` — no separate download step needed.
+OCR for scanned PDFs needs Tesseract and Poppler installed on the machine (see `backend/Dockerfile`).
 
-Visit `http://localhost:5173`. In dev, Vite proxies `/api/*` to the
-FastAPI server on port 8000 (see `vite.config.js`), so you don't need
-CORS configured for local work.
+## Environment variables (`backend/.env`)
 
-### Try it end-to-end
+| Variable                                                                      | Purpose |
+|-------------------------------------------------------------------------------|---|
+| `MONGO_URI`, `MONGO_DB`                                                       | MongoDB connection (Atlas) and database name (default `ai_recruiter`) |
+| `JWT_SECRET`                                                                  | Long random string that signs logins. Changing it logs everyone out |
+| `HR_ADMIN_ID`, `HR_ADMIN_PASSWORD`                                            | The only HR login that is accepted |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`                                              | Gemini access and model name |
+| `GEMINI_CONCURRENCY`                                                          | Parallel Gemini calls (use `2` on the free tier) |
+| `USE_SEARCH_GROUNDING`                                                        | `true` lets Gemini use Google Search for model answers (needs paid quota). Default off |
+| `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `MAIL_ENABLED`                         | Sending access codes and notifications. Use a Gmail **App Password** |
+| `FRONTEND_ORIGIN`                                                             | Your deployed frontend URL (comma separated for several) |
+| `APP_ENV`                                                                     | `production` hides `/docs` and refuses `*` for CORS |
+| `TRUST_PROXY`                                                                 | `true` behind Nginx/Render so rate limits see the real client IP |
+| `FACE_MATCH_THRESHOLD`                                                        | Face match strictness, default `0.5` (try `0.55` if students fail in poor light) |
+| `ONE_STUDENT_PER_DEVICE`                                                      | `false` if students share lab computers. Default `true` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`                                         | Optional overrides for a non-Gmail mail server |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM(SMS Not Working Yet)` | Optional, for SMS access codes |
+| `DEFAULT_COUNTRY_CODE`, `INVITE_CODE_PREFIX`                                  | Optional, default `+91` and `EXAM` |
 
-1. Go to `/hr/login`, sign up an HR account.
-2. Upload a resume PDF + paste a job description → candidates get
-   ranked automatically.
-3. Shortlist a candidate from the dashboard.
-4. Note the `CAND_XXXXXXXX` id shown for that candidate.
-5. Go to `/candidate/login` → "First time" tab → sign up with that
-   candidate id + an email/password. (Face enrollment happens the
-   first time you use "Face login" successfully once you've set up a
-   descriptor — see the note below on adding an enroll button to the
-   candidate flow if you want it front-and-center.)
-6. Take the interview — the small webcam thumbnail bottom-right is the
-   anti-cheat monitor running live.
-7. Back on the HR dashboard, click "Generate feedback" once the
-   candidate finishes — the candidate will see it next time they log in.
-8. Want to start over? Hit the dev-reset button on the login screens
-   (wired to `POST /dev/reset-all`), or call that endpoint directly.
+Never commit `.env`.
 
----
+## How to run an exam
 
-## 2. What's implemented for each feature you asked for
+1. Log in at `/hr/login` with your `HR_ADMIN_ID` / `HR_ADMIN_PASSWORD`.
+2. **Question gen** → add the syllabus → type the chapters → pick style and type → Generate.
+3. Edit the paper, set the **exam time window**, then **Approve**. Only one paper is live at a time.
+4. **Exam module** → upload the student list → **Send access codes**.
+5. Share one link with the class: `https://your-site/candidate/login`.
+6. Students sign up with their code, enrol their face, and wait for the start time.
+7. After the exam, open **Question gen → Student reports** for scores, answers and integrity flags.
 
-| Feature | Where |
-|---|---|
-| Candidate face detection | `AntiCheatMonitor.jsx` (continuous, during interview) |
-| Face authentication login | `FaceAuth.jsx` + `auth_router.py` (`/auth/face/enroll`, `/auth/face/login`) |
-| Feedback to candidate | `feedback_router.py` + candidate interview page (shown after completion) |
-| UI advancement | Full React/Tailwind rebuild replacing Streamlit |
-| Anti-cheat / warning system | `AntiCheatMonitor.jsx` + `proctoring_router.py` (no-face, multiple-faces, tab-switch, fullscreen-exit, copy/paste) |
-| Dev/testing reset | `dev_router.py` (`POST /dev/reset-all`) + `DevResetButton.jsx` |
+## Deployment
 
-**Security note on face auth:** the browser computes a 128-number face
-descriptor locally and only ever sends that array to the server — never
-a photo or video frame. Enrollment stores the descriptor per candidate;
-login does a nearest-match search against all enrolled descriptors.
-This keeps raw biometric images off your server, which matters a lot
-for privacy/compliance once you have real candidates using this.
+- **Backend** (Render, Railway, Fly.io or a VPS): root `backend`, build `pip install -r requirements.txt`, start
+  `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Use a **single worker**: rate limits and background scoring run
+  in-process. Set the variables above and `APP_ENV=production`.
+- **Frontend** (Vercel, Netlify): root `frontend`, build `npm run build`, output `dist`, `VITE_API_URL` = backend URL.
+  Add `vercel.json` with `{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}` so page reloads work.
+- **HTTPS is required** for camera and screen share.
+- **Atlas:** restrict network access where you can, use a strong database password, enable backups.
+- Free hosts sleep when idle and may block outgoing mail ports. Wake the site before an exam and send access codes
+  ahead of time.
 
-**What's stubbed / simplified on purpose** (call these out to yourself
-before a real launch):
-- Face descriptors are compared with a linear scan — fine for hundreds
-  of candidates, but swap for a proper vector index (e.g. Atlas Vector
-  Search / pgvector) if you scale past that.
-- There's no "enroll my face" step wired into the UI yet beyond the
-  API — add a button on the candidate dashboard that calls
-  `FaceAuth mode="enroll"` once they've done their first password login.
-- Proctoring events are logged but there's no auto-disqualify rule for
-  most flags — `MAX_CHEAT_WARNINGS` (in `storage.py`, currently 3) does
-  auto-end an interview once enough strikes accumulate, but HR still
-  makes the final call rather than anything being auto-rejected.
-- `dev_router.py` / `POST /dev/reset-all` has no auth and wipes all
-  data — fine for local testing, must be removed before a real deploy.
+## Known limits
 
----
+- Free Gemini keys are rate-limited. Prefer mostly MCQ/fill-in papers; use **Rescore all failed** if some marking fails.
+- Proctoring runs in the student's browser (see the note above).
+- Device locks follow the browser's stored data; HR can reset a student's device from the reports tab.
+- Face matching is a 1:1 comparison against the sign-up photo's descriptor, not a vector search.
 
-## 3. Deployment (so you don't hit surprises)
+## Roadmap
 
-**Backend** — needs a real process host (not static hosting) because
-of the OCR system dependencies:
-- Render / Railway / Fly.io all work well with the provided `Dockerfile`.
-- Storage is already MongoDB, so there's no SQLite-to-Postgres migration
-  needed — just point `MONGO_URI` at a MongoDB Atlas (or other hosted
-  Mongo) connection string instead of a local instance before you have
-  real concurrent users.
-- Set `GEMINI_API_KEY`, `JWT_SECRET` (long random string, not the demo
-  default), `MONGO_URI`, and `FRONTEND_ORIGIN` (your deployed frontend
-  URL, not `*`) as environment variables on the host.
-- Remove the `dev_router` include in `app/main.py` before deploying.
+- Job queue for scoring that survives restarts
+- Server-side proctoring signals and invigilator live view
+- Per-student data export and automatic deletion after a retention period
 
-**Frontend** — static hosting is fine:
-- Vercel / Netlify / Cloudflare Pages: point at `frontend/`, build
-  command `npm run build`, output dir `dist`.
-- Set `VITE_API_URL` to your deployed backend's URL at build time.
-- Face-api.js model files ship automatically since they live under
-  `public/models/` and are already committed — nothing extra to fetch
-  in CI.
-- **HTTPS is mandatory** for webcam access (`getUserMedia`) to work on
-  any domain other than `localhost` — browsers block camera access on
-  plain HTTP. Both Vercel/Netlify give you HTTPS by default, so this is
-  usually automatic, just don't skip it if you self-host.
+## License / credits
 
----
-
-## 4. Suggested next steps, roughly in priority order
-
-1. Remove `dev_router` (`/dev/reset-all`) from `app/main.py` before any
-   real candidates use this.
-2. Add rate limiting on `/auth/*` endpoints (brute-force protection).
-3. Add an "enroll face" button into the candidate's post-login flow.
-4. Add email notifications (interview invite, feedback ready) — you
-   already have the candidate's email captured at signup.
-5. Move Gemini calls to background tasks/a queue if question generation
-   or feedback generation starts feeling slow under load.
-6. Swap the linear face-descriptor scan for a proper vector index
-   (Atlas Vector Search or similar) once candidate volume grows.
+Built by Bhaumik. Uses FastAPI, React, MongoDB, Gemini and face-api.js.

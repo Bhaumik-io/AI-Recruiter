@@ -50,7 +50,12 @@ function avgPoint(points) {
   return { x: sum.x / n, y: sum.y / n }
 }
 
-export default function AntiCheatMonitor({ candidateId, onTerminated, screenStream }) {
+// verifyFn (optional): async (descriptor) => boolean. Exam only: every verifyEveryMs the
+// current face is compared with the enrolled one; 3 misses in a row = 'face_mismatch' strike.
+export default function AntiCheatMonitor({ candidateId, onTerminated, screenStream, label = 'interview', verifyFn, verifyEveryMs = 60000, onCameraState }) {
+  const cameraCbRef = useRef(onCameraState)
+  cameraCbRef.current = onCameraState
+  const cameraLostRef = useRef(false)
   const videoRef = useRef(null)
   const [warnings, setWarnings] = useState([])
   const [warningCount, setWarningCount] = useState(0)
@@ -59,6 +64,9 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
   const noFaceStreakRef = useRef(0)
   const multiFaceStreakRef = useRef(0)
   const lookingAwayStreakRef = useRef(0)
+  const lastVerifyRef = useRef(Date.now())
+  const verifyBusyRef = useRef(false)
+  const mismatchRef = useRef(0)
 
   function pushWarning(text) {
     setWarnings((w) => [...w.slice(-4), { text, at: new Date().toLocaleTimeString() }])
@@ -126,6 +134,7 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
     Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      ...(verifyFn ? [faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)] : []),
     ])
       .then(() => navigator.mediaDevices.getUserMedia({ video: {} }))
       .then((s) => {
@@ -135,6 +144,14 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
         }
         stream = s
         if (videoRef.current) videoRef.current.srcObject = s
+        cameraCbRef.current?.(true)
+        s.getVideoTracks()[0]?.addEventListener('ended', () => {
+          if (!cameraLostRef.current) {
+            cameraLostRef.current = true
+            cameraCbRef.current?.(false)
+            report('no_face', 'high', 'Camera stopped working', 'camera lost')
+          }
+        })
 
         intervalId = setInterval(async () => {
           if (!videoRef.current || videoRef.current.readyState < 3) return
@@ -161,6 +178,32 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
             // exactly one face — reset presence streaks, then check gaze
             noFaceStreakRef.current = 0
             multiFaceStreakRef.current = 0
+
+            // exam only: is this still the enrolled student?
+            if (verifyFn && !verifyBusyRef.current && Date.now() - lastVerifyRef.current > verifyEveryMs) {
+              verifyBusyRef.current = true
+              try {
+                const full = await faceapi.detectSingleFace(videoRef.current, DETECTOR_OPTIONS).withFaceLandmarks().withFaceDescriptor()
+                if (full) {
+                  const ok = await verifyFn(Array.from(full.descriptor))
+                  if (ok) {
+                    mismatchRef.current = 0
+                    lastVerifyRef.current = Date.now()
+                  } else {
+                    mismatchRef.current += 1
+                    if (mismatchRef.current >= 3) {
+                      mismatchRef.current = 0
+                      lastVerifyRef.current = Date.now()
+                      report('face_mismatch', 'high', 'Face does not match the registered student')
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('Face re-check failed', e)
+              } finally {
+                verifyBusyRef.current = false
+              }
+            }
 
             const withLandmarks = await faceapi
               .detectSingleFace(videoRef.current, DETECTOR_OPTIONS)
@@ -191,7 +234,10 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
           }
         }, CHECK_INTERVAL_MS)
       })
-      .catch(() => pushWarning('Camera unavailable — proctoring limited'))
+      .catch(() => {
+        pushWarning('Camera unavailable — proctoring limited')
+        cameraCbRef.current?.(false)
+      })
 
     const onVisibilityChange = () => {
       if (document.hidden) {
@@ -287,7 +333,7 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
         className="w-40 h-28 object-cover rounded-lg border-2 border-slate-700 shadow-lg opacity-90" />
       {warningCount > 0 && (
         <div className="text-xs font-semibold bg-red-500/20 border border-red-500/40 text-red-300 px-2 py-1 rounded">
-          ⚠ Cheating warning {warningCount}/{MAX_WARNINGS} — 3rd strike auto-ends the interview
+          ⚠ Cheating warning {warningCount}/{MAX_WARNINGS} — 3rd strike auto-ends the {label}
         </div>
       )}
       <div className="flex flex-col gap-1 w-full">
