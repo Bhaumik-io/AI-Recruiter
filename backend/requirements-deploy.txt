@@ -1,0 +1,28 @@
+﻿# AI Recruiter V3 - Exam + Interview Suite (backend)
+# Install:  pip install -r requirements.txt
+
+# --- web framework ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9          # file uploads (resumes, syllabus, student lists)
+pydantic[email]==2.9.2
+
+# --- resume parsing / OCR (interview suite) ---
+pdfplumber==0.11.4
+pytesseract==0.3.13              # needs Tesseract installed on the machine
+pdf2image==1.17.0                # needs Poppler installed on the machine
+
+# --- AI ---
+google-genai==0.3.0              # Gemini (keep the version you have been running locally)
+
+# --- auth ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1                    # newer bcrypt breaks passlib 1.7.4
+
+# --- database / config ---
+pymongo==4.9.1
+python-dotenv==1.0.1
+
+# --- NEW in V3 (exam suite) ---
+openpyxl==3.1.5                  # student lists in .xlsx
