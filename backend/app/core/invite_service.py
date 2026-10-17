@@ -155,6 +155,12 @@ def parse_students(rows: list[list[str]]) -> dict:
 
 # ------------------------------------------------------------------ email
 def email_config():
+    api_key = os.getenv("BREVO_API_KEY")
+    if api_key and os.getenv("MAIL_ENABLED", "true").lower() == "true":
+        sender = os.getenv("SMTP_FROM") or os.getenv("GMAIL_ADDRESS") or ""
+        if sender:
+            return {"api": True, "api_key": api_key, "host": "api.brevo.com", "port": 443,
+                    "user": sender, "password": "", "from": sender}
     # Reuses the app's existing Gmail settings (same ones mailer.py uses); SMTP_* names still work too.
     user = os.getenv("SMTP_USER") or os.getenv("GMAIL_ADDRESS")
     pw = os.getenv("SMTP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
@@ -169,7 +175,64 @@ def email_config():
     }
 
 
+
+# ------------------------------------------------------------------ HTTPS mail (Brevo)
+import json as _json
+from email.utils import parseaddr as _parseaddr
+
+
+class ApiMailError(smtplib.SMTPException):
+    pass
+
+
+class _ApiMailer:
+    """Looks like an smtplib connection (send_message / quit) but posts to Brevo over HTTPS."""
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def send_message(self, msg):
+        name, addr = _parseaddr(str(msg["From"] or self.cfg["from"]))
+        to_name, to_addr = _parseaddr(str(msg["To"]))
+        html_part = msg.get_body(preferencelist=("html",))
+        text_part = msg.get_body(preferencelist=("plain",))
+        payload = {
+            "sender": {"name": name or "Exam Team", "email": addr},
+            "to": [{"email": to_addr, **({"name": to_name} if to_name else {})}],
+            "subject": str(msg["Subject"] or ""),
+        }
+        if html_part is not None:
+            payload["htmlContent"] = html_part.get_content()
+        if text_part is not None:
+            payload["textContent"] = text_part.get_content()
+        req = urllib.request.Request(
+            os.getenv("BREVO_API_URL", "https://api.brevo.com/v3/smtp/email"),
+            data=_json.dumps(payload).encode(),
+            method="POST",
+            headers={"api-key": self.cfg["api_key"], "content-type": "application/json", "accept": "application/json"},
+        )
+        try:
+            urllib.request.urlopen(req, timeout=30).read()
+        except urllib.error.HTTPError as e:
+            raise ApiMailError(f"Brevo {e.code}: {e.read().decode(errors='ignore')[:200]}")
+        except Exception as e:
+            raise ApiMailError(f"Brevo request failed: {e}")
+
+    def quit(self):
+        pass
+
+    close = quit
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
 def smtp_open(cfg):
+    if cfg.get("api"):
+        return _ApiMailer(cfg)
     ctx = ssl.create_default_context()
     alt = 465 if cfg["port"] != 465 else 587
     last = None

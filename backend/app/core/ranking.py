@@ -12,8 +12,6 @@ way relevant experience buried later in a resume still gets captured.
 """
 import os
 
-from sentence_transformers import SentenceTransformer, util
-
 try:
     import streamlit as st
     IN_STREAMLIT = True
@@ -36,6 +34,13 @@ def get_model():
             "RANKING_EMBEDDING_MODEL",
             "all-MiniLM-L6-v2",
         )
+        try:
+            from sentence_transformers import SentenceTransformer  # lazy import (heavy)
+        except ImportError:
+            raise RuntimeError(
+                "Resume ranking is not available on this server "
+                "(sentence-transformers is not installed)."
+            )
         _model = SentenceTransformer(model_name)
     return _model
 
@@ -78,6 +83,7 @@ def rank_candidates(candidates: dict, jd_text: str) -> list:
     [{"candidate_id": ..., "score": 0.82, "reason": "..."}, ...]
     """
     model = get_model()
+    from sentence_transformers import util  # lazy import
     jd_embedding = model.encode(jd_text, convert_to_tensor=True)
 
     # Build ONE combined list of chunks across ALL candidates, remembering

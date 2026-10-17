@@ -6,7 +6,6 @@ not keyword matching).
 """
 
 from app.core.ranking import get_model
-from sentence_transformers import util
 
 
 def score_answer(candidate_answer: str, ideal_answer: str) -> float:
@@ -15,6 +14,7 @@ def score_answer(candidate_answer: str, ideal_answer: str) -> float:
         return 0.0
 
     model = get_model()
+    from sentence_transformers import util  # lazy import (heavy)
     emb1 = model.encode(candidate_answer, convert_to_tensor=True)
     emb2 = model.encode(ideal_answer, convert_to_tensor=True)
     similarity = util.cos_sim(emb1, emb2).item()
