@@ -4,6 +4,7 @@ import { hrApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Card from '../components/Card'
 import ConferencePanel from '../components/ConferencePanel'
+import { EXAM_ONLY } from '../lib/mode'
 
 function overallScore(c) {
   const r = c.resume_score
@@ -14,7 +15,7 @@ function overallScore(c) {
   return (r + i) / 2
 }
 
-export default function HRDashboard() {
+function FullHRDashboard() {
   const [files, setFiles] = useState([])
   const [jdText, setJdText] = useState('')
   const [candidates, setCandidates] = useState([])
@@ -272,4 +273,40 @@ export default function HRDashboard() {
       <ConferencePanel />
     </div>
   )
+}
+
+
+// Exam-only home: just the two exam tools. The full recruiter dashboard above stays in the
+// code and comes back when VITE_EXAM_ONLY=false (for example on your laptop).
+function ExamHome() {
+  const { logoutHR } = useAuth()
+  const tools = [
+    ['/hr/exam-module', 'Exam module', 'Invite students, set the exam window, go live and read the results.'],
+    ['/hr/question-gen', 'Question gen', 'Upload a syllabus, generate a paper, edit it and approve it.'],
+  ]
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <p className="eyebrow mb-1">HR workspace</p>
+          <h1 className="text-2xl font-bold">HR Dashboard</h1>
+        </div>
+        <button onClick={logoutHR} className="text-sm text-slate-400 hover:text-slate-200">Log out</button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {tools.map(([to, label, text]) => (
+          <Link key={to} to={to}>
+            <Card className="h-full hover:border-slate-600 transition">
+              <h2 className="font-semibold mb-1">{label}</h2>
+              <p className="text-sm text-slate-400">{text}</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function HRDashboard() {
+  return EXAM_ONLY ? <ExamHome /> : <FullHRDashboard />
 }
