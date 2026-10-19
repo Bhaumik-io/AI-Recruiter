@@ -12,6 +12,8 @@ way relevant experience buried later in a resume still gets captured.
 """
 import os
 
+from app.core.embeddings import cosine, embed, _use_local
+
 try:
     import streamlit as st
     IN_STREAMLIT = True
@@ -24,27 +26,12 @@ _model = None
 
 def get_model():
     """
-    Load the embedding model once and reuse it.
-    Cache it in memory so repeated calls don't reload it.
+    Local sentence-transformers model (only when it is installed). Kept for code that
+    imports get_model directly; ranking itself goes through app.core.embeddings, which
+    uses Gemini embeddings when the local model isn't available.
     """
-    global _model
-
-    if _model is None:
-        model_name = os.getenv(
-            "RANKING_EMBEDDING_MODEL",
-            "all-MiniLM-L6-v2",
-        )
-        try:
-            from sentence_transformers import SentenceTransformer  # lazy import (heavy)
-        except ImportError:
-            raise RuntimeError(
-                "Resume ranking is not available on this server "
-                "(sentence-transformers is not installed)."
-            )
-        _model = SentenceTransformer(model_name)
-    return _model
-
-
+    from app.core.embeddings import get_local_model
+    return get_local_model()
 
 
 if IN_STREAMLIT:
@@ -54,11 +41,17 @@ if IN_STREAMLIT:
     get_model = st.cache_resource(show_spinner=False)(get_model)
 
 
-def chunk_text(text: str, max_words: int = 150, overlap: int = 30) -> list:
+def chunk_text(text: str, max_words: int = None, overlap: int = None) -> list:
     """
     Splits text into overlapping word-based chunks so no relevant section
     of a long resume gets silently cut off by the model's token limit.
     """
+    # local MiniLM only reads ~256 tokens, so it needs small chunks; Gemini reads far more,
+    # and fewer/larger chunks mean fewer texts to embed (kinder to the free quota).
+    if max_words is None:
+        max_words, overlap = (150, 30) if _use_local() else (300, 50)
+    if overlap is None:
+        overlap = 30
     words = text.split()
     if len(words) <= max_words:
         return [text]
@@ -82,10 +75,6 @@ def rank_candidates(candidates: dict, jd_text: str) -> list:
     Returns a list of dicts sorted by score descending:
     [{"candidate_id": ..., "score": 0.82, "reason": "..."}, ...]
     """
-    model = get_model()
-    from sentence_transformers import util  # lazy import
-    jd_embedding = model.encode(jd_text, convert_to_tensor=True)
-
     # Build ONE combined list of chunks across ALL candidates, remembering
     # which candidate each chunk belongs to, then encode everything in a
     # single batched model.encode() call instead of one call per candidate.
@@ -114,17 +103,16 @@ def rank_candidates(candidates: dict, jd_text: str) -> list:
         })
 
     if all_chunks:
-        # batch_size can be tuned depending on available RAM/CPU; 64 is a
-        # safe default that still captures most of the speedup.
-        chunk_embeddings = model.encode(
-            all_chunks, convert_to_tensor=True, batch_size=64
-        )
-        chunk_similarities = util.cos_sim(chunk_embeddings, jd_embedding).squeeze(-1)
+        # ONE batched embedding call for the job description + every chunk. Repeated texts
+        # (same resume, same JD) come from the cache and cost no Gemini quota.
+        vectors = embed([jd_text] + all_chunks)
+        jd_embedding, chunk_embeddings = vectors[0], vectors[1:]
+        chunk_similarities = [cosine(v, jd_embedding) for v in chunk_embeddings]
 
         # Regroup per-chunk scores back by candidate, keep each
         # candidate's best-matching chunk.
         best_by_candidate = {}
-        for cid, sim in zip(chunk_owner, chunk_similarities.tolist()):
+        for cid, sim in zip(chunk_owner, chunk_similarities):
             if cid not in best_by_candidate or sim > best_by_candidate[cid]:
                 best_by_candidate[cid] = sim
 
