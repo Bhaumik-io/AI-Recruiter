@@ -380,6 +380,125 @@ def rescore(paper_id: str, candidate_id: str, bg: BackgroundTasks, hr=Depends(ge
     bg.add_task(_score_in_background, paper_id, candidate_id)
     return {"ok": True}
 
+# ---------------------------------------------------------------- HR: result review + manual score edit
+# PASTE this block into backend/app/routers/exam_router.py, right after the `rescore` route
+# (the one ending with `return {"ok": True}` just above "# ---- candidate side").
+#
+# Design: an edit changes results[i].score and total_score, so the existing report and the
+# student's own result screen both show the edited marks automatically. The AI's original
+# mark is kept in results[i].ai_score and is never lost.
+
+
+class ScoreEditBody(BaseModel):
+    q_no: int
+    score: float
+    note: str = ""
+
+
+def _hr_detail(p: dict, sub: dict) -> dict:
+    """One student's answers next to the ideal answers, AI marks and any HR edits."""
+    by_q = {r["q_no"]: r for r in (sub.get("results") or [])}
+    answers = sub.get("answers") or {}
+    items = []
+    for q in p["questions"]:
+        r = by_q.get(q["q_no"], {})
+        ai = r.get("ai_score", r.get("score"))
+        items.append(
+            {
+                "q_no": q["q_no"],
+                "type": q.get("type", ""),
+                "question": q["question"],
+                "options": q.get("options", []),
+                "max_marks": q["marks"],
+                "student_answer": r.get("student_answer", answers.get(str(q["q_no"]), "")),
+                "ideal_answer": q.get("reference_answer", ""),
+                "key_points": q.get("key_points", []),
+                "ai_score": ai,
+                "score": r.get("score"),
+                "edited": bool(r.get("edited")),
+                "note": r.get("note", ""),
+                "feedback": r.get("feedback", ""),
+                "missing_points": r.get("missing_points", []),
+            }
+        )
+    return {
+        "paper_id": p["paper_id"],
+        "candidate_id": sub["candidate_id"],
+        "status": sub.get("status"),
+        "total_score": sub.get("total_score"),
+        "max_total": sub.get("max_total"),
+        "flagged": sub.get("flagged", False),
+        "terminated": sub.get("terminated", False),
+        "termination_reason": sub.get("termination_reason", ""),
+        "proctoring": sub.get("proctoring"),
+        "submitted_at": sub.get("submitted_at"),
+        "items": items,
+    }
+
+
+@router.get("/papers/{paper_id}/submissions/{candidate_id}")
+def hr_submission_detail(paper_id: str, candidate_id: str, hr=Depends(get_current_hr)):
+    p = st.papers.find_one({"paper_id": paper_id}, st.NO_ID)
+    if not p:
+        raise HTTPException(404, "Paper not found")
+    sub = st.submissions.find_one({"paper_id": paper_id, "candidate_id": candidate_id}, st.NO_ID)
+    if not sub:
+        raise HTTPException(404, "This student has not submitted")
+    out = _hr_detail(p, sub)
+    out.update(_people([candidate_id]).get(candidate_id, {}))  # name, roll_no
+    return out
+
+
+@router.put("/papers/{paper_id}/submissions/{candidate_id}/score")
+def hr_edit_score(paper_id: str, candidate_id: str, body: ScoreEditBody, hr=Depends(get_current_hr)):
+    p = st.papers.find_one({"paper_id": paper_id}, st.NO_ID)
+    if not p:
+        raise HTTPException(404, "Paper not found")
+    q = next((x for x in p["questions"] if x["q_no"] == body.q_no), None)
+    if not q:
+        raise HTTPException(404, "Question not found")
+    if body.score < 0 or body.score > q["marks"]:
+        raise HTTPException(400, f"Score must be between 0 and {q['marks']}")
+    key = {"paper_id": paper_id, "candidate_id": candidate_id}
+    sub = st.submissions.find_one(key, st.NO_ID)
+    if not sub:
+        raise HTTPException(404, "This student has not submitted")
+    if sub.get("status") != "scored":
+        raise HTTPException(409, "Wait until this answer sheet has been scored (or rescore it first)")
+    results = sub.get("results") or []
+    r = next((x for x in results if x["q_no"] == body.q_no), None)
+    if not r:
+        raise HTTPException(404, "No result row for this question")
+    r.setdefault("ai_score", r.get("score"))  # keep the AI's mark the first time only
+    r["score"] = round(body.score, 2)
+    r["edited"] = True
+    r["note"] = body.note.strip()[:500]
+    r["edited_at"] = st.now()
+    total = round(sum(x["score"] for x in results), 2)
+    st.submissions.update_one(key, {"$set": {"results": results, "total_score": total}})
+    return _hr_detail(p, {**sub, "results": results, "total_score": total})
+
+
+@router.post("/papers/{paper_id}/submissions/{candidate_id}/score/reset")
+def hr_reset_score(paper_id: str, candidate_id: str, body: ScoreEditBody, hr=Depends(get_current_hr)):
+    """Put the AI's original mark back for one question."""
+    p = st.papers.find_one({"paper_id": paper_id}, st.NO_ID)
+    key = {"paper_id": paper_id, "candidate_id": candidate_id}
+    sub = st.submissions.find_one(key, st.NO_ID)
+    if not p or not sub:
+        raise HTTPException(404, "Not found")
+    results = sub.get("results") or []
+    r = next((x for x in results if x["q_no"] == body.q_no), None)
+    if not r or not r.get("edited"):
+        raise HTTPException(400, "This question has not been edited")
+    r["score"] = r.get("ai_score", r["score"])
+    r["edited"] = False
+    r["note"] = ""
+    total = round(sum(x["score"] for x in results), 2)
+    st.submissions.update_one(key, {"$set": {"results": results, "total_score": total}})
+    return _hr_detail(p, {**sub, "results": results, "total_score": total})
+
+
 
 # ---------------------------------------------------------------- candidate side
 def _bind_device(cid: str, request: Request) -> str:
