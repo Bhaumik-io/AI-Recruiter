@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // request has been running for more than a few seconds (the free server can be slow when many students
 // arrive together). Refreshing or clicking again only makes the queue longer.
 // Mounted once in App.jsx; it watches network calls (fetch and axios) so no page needs to change.
-const WATCH = ["/auth/", "/exam/face-check", "/exam/start", "/exam/submit", "/exam-invites/"];
+const WATCH = ["/auth/", "/exam/face-check", "/exam/start", "/exam/submit", "/exam-invites/", "/exam/syllabus", "/exam/papers/generate", "/exam/approve", "/rescore"];
 const SHOW_AFTER_MS = 3000;
 const watched = (url) => WATCH.some((p) => String(url || "").includes(p));
 
@@ -65,7 +65,7 @@ export default function SlowNotice() {
       role="status"
       className="fixed inset-x-0 top-0 z-[100] border-b border-[#5a4a1f] bg-[#241c08] px-4 py-2.5 text-center text-xs text-[#e3b552] shadow-lg"
     >
-      ⏳ Please wait. This can take up to a minute when many students are online.{" "}
+      ⏳ Please wait. This can take up to a minute when many people are online or the AI is working.{" "}
       <b className="text-white">Do not refresh the page or click again.</b>
     </div>
   );
