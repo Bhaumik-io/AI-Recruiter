@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { examApi } from "../lib/examApi";
 import { T } from "../lib/examTheme";
 import ExamReports from "./ExamReports";
+import ResultsTab from "./ResultsTab";
 
 // ISO (UTC) <-> the value a <input type="datetime-local"> wants (this computer's local time)
 const toLocalInput = (iso) => {
@@ -16,7 +17,7 @@ const fromLocalInput = (v) => (v ? new Date(v).toISOString() : null);
 const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
 
 export default function QuestionGenModule() {
-  const [tab, setTab] = useState("create"); // create | reports
+  const [tab, setTab] = useState("create"); // create | reports | results
   const [files, setFiles] = useState([]);
   const [syllabus, setSyllabus] = useState(null);
   const [prompt, setPrompt] = useState("");
@@ -104,9 +105,13 @@ export default function QuestionGenModule() {
         <button className={T.tab(tab === "reports")} onClick={() => setTab("reports")}>
           Student reports
         </button>
+        <button className={T.tab(tab === "results")} onClick={() => setTab("results")}>
+          Result
+        </button>
       </div>
 
       {tab === "reports" && <ExamReports />}
+      {tab === "results" && <ResultsTab />}
 
       {tab === "create" && (
         <>

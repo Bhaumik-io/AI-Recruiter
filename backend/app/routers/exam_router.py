@@ -380,13 +380,8 @@ def rescore(paper_id: str, candidate_id: str, bg: BackgroundTasks, hr=Depends(ge
     bg.add_task(_score_in_background, paper_id, candidate_id)
     return {"ok": True}
 
+
 # ---------------------------------------------------------------- HR: result review + manual score edit
-# PASTE this block into backend/app/routers/exam_router.py, right after the `rescore` route
-# (the one ending with `return {"ok": True}` just above "# ---- candidate side").
-#
-# Design: an edit changes results[i].score and total_score, so the existing report and the
-# student's own result screen both show the edited marks automatically. The AI's original
-# mark is kept in results[i].ai_score and is never lost.
 
 
 class ScoreEditBody(BaseModel):
@@ -497,7 +492,6 @@ def hr_reset_score(paper_id: str, candidate_id: str, body: ScoreEditBody, hr=Dep
     total = round(sum(x["score"] for x in results), 2)
     st.submissions.update_one(key, {"$set": {"results": results, "total_score": total}})
     return _hr_detail(p, {**sub, "results": results, "total_score": total})
-
 
 
 # ---------------------------------------------------------------- candidate side
@@ -664,7 +658,10 @@ def active_paper(bg: BackgroundTasks, request: Request, cand=Depends(get_current
                 "status": sub["status"],
                 "total_score": sub.get("total_score"),
                 "max_total": sub.get("max_total"),
-                "results": sub.get("results", []),
+                "results": [  # HR-only fields (AI mark, private note) are never sent to the student
+                    {k: v for k, v in r.items() if k not in ("ai_score", "note", "edited", "edited_at")}
+                    for r in sub.get("results", [])
+                ],
                 "terminated": sub.get("terminated", False),
                 "termination_reason": sub.get("termination_reason", ""),
             }

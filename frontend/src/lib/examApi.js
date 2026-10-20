@@ -70,6 +70,12 @@ export const examApi = {
   deactivate: (id) => req(`/exam/papers/${id}/deactivate`, { method: "POST" }),
   report: (id) => req(`/exam/papers/${id}/report`),
   rescore: (id, cid) => req(`/exam/papers/${id}/rescore/${cid}`, { method: "POST" }),
+  // HR result review + manual score edits
+  submission: (id, cid) => req(`/exam/papers/${id}/submissions/${cid}`),
+  editScore: (id, cid, q_no, score, note = "") =>
+    req(`/exam/papers/${id}/submissions/${cid}/score`, { method: "PUT", json: { q_no, score, note } }),
+  resetScore: (id, cid, q_no) =>
+    req(`/exam/papers/${id}/submissions/${cid}/score/reset`, { method: "POST", json: { q_no, score: 0 } }),
   // candidate
   active: () => req("/exam/active"),
   faceCheck: (descriptor) => req("/exam/face-check", { method: "POST", json: { descriptor } }),
