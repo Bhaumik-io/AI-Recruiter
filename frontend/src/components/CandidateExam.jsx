@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { T } from "../lib/examTheme";
 import AntiCheatMonitor from "./AntiCheatMonitor";
 import ExamReadiness from "./ExamReadiness";
-import { FeedbackButton, FeedbackGate } from "./FeedbackButton";
+import { FeedbackButton, FeedbackPopup } from "./FeedbackButton";
 
 // stable (module level) because AntiCheatMonitor keeps the props of its first render
 const verifyFace = (descriptor) => examApi.faceCheck(descriptor).then((r) => r.match);
@@ -273,7 +273,7 @@ export default function CandidateExam() {
           <div className={T.error}>Submitted. Scoring hit a problem; your teacher will review it.</div>
         )}
         {submission.status === "scored" && (
-          <FeedbackGate userId={candidateId}>
+          <>
             <div className={T.card}>
               <div className={T.muted}>Your score</div>
               <div className="text-3xl font-semibold text-white">
@@ -291,7 +291,8 @@ export default function CandidateExam() {
                 <div className={T.muted}>{r.feedback}</div>
               </div>
             ))}
-          </FeedbackGate>
+            <FeedbackPopup userId={candidateId} />
+          </>
         )}
         <button onClick={logoutCandidate} className={T.btnGhost}>
           Log out

@@ -25,21 +25,24 @@ const cell = (v) => {
 };
 
 function downloadCsv(report, rows) {
-  const qn = Math.max(0, ...rows.map((s) => (s.results || []).length));
-  const head = ["Name", "Roll no", "Candidate ID", "Status", "Total", "Max", "Percent", "Flagged",
-    "Proctoring warnings", "Auto-ended", "Submitted at", "Edited by HR"];
-  for (let i = 1; i <= qn; i++) head.push(`Q${i} mark`);
+  // Simple sheet: one row per student, plain-language columns.
+  // "26 out of 36" is written in words so Excel does not turn it into a date.
+  const head = ["Sr No", "Name", "Roll No", "Marks", "Percent", "Cheating check", "Status"];
   const lines = [head.map(cell).join(",")];
-  for (const s of rows) {
-    const res = s.results || [];
-    const pct = s.total_score != null && s.max_total ? Math.round((s.total_score / s.max_total) * 1000) / 10 : "";
-    const row = [s.name, s.roll_no, s.candidate_id, s.status, s.total_score ?? "", s.max_total ?? "", pct,
-      s.flagged ? "Yes" : "No", s.proctoring?.total ?? 0, s.terminated ? "Yes" : "No",
-      s.submitted_at || "", res.some((x) => x.edited) ? "Yes" : "No"];
-    for (let i = 0; i < qn; i++) row.push(res[i] ? res[i].score : "");
+  rows.forEach((s, i) => {
+    const has = s.total_score != null;
+    const pct = has && s.max_total ? `${Math.round((s.total_score / s.max_total) * 1000) / 10}%` : "";
+    const p = s.proctoring;
+    const integrity = s.terminated
+      ? "Auto-ended (cheating)"
+      : p?.total > 0
+        ? `${p.total} warning${p.total === 1 ? "" : "s"}`
+        : "Clean";
+    const status = { scored: "Checked", scoring: "Being checked", score_failed: "Scoring failed", not_submitted: "Not submitted" }[s.status] || s.status;
+    const row = [i + 1, s.name || s.candidate_id, s.roll_no, has ? `${s.total_score} out of ${s.max_total}` : "", pct, integrity, status];
     lines.push(row.map(cell).join(","));
-  }
-  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  });
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `${(report.title || "results").replace(/[^\w-]+/g, "_")}_results.csv`;
