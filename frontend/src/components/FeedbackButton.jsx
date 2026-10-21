@@ -64,3 +64,36 @@ export function FeedbackPopup({ userId }) {
     </div>
   );
 }
+
+// Popup that the parent opens (used for HR after "Download CSV"). "Give feedback" opens the form and
+// is remembered; "Later" only closes it, so HR is asked again at the next download until they give feedback.
+export function FeedbackDialog({ role, userId, onClose }) {
+  const url = FEEDBACK_URL[role];
+  if (!url) return null;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className={`${T.card} w-full max-w-sm text-center`} onClick={(e) => e.stopPropagation()}>
+        <div className={T.eyebrow}>Your file is downloading</div>
+        <div className={T.cardTitle}>How was your experience as HR?</div>
+        <div className={T.muted}>Please take a minute to share feedback about the exam platform.</div>
+        <div className="flex justify-center gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              markFeedbackGiven(role, userId);
+              onClose();
+            }}
+            className={T.btnGold}
+          >
+            Give feedback
+          </a>
+          <button onClick={onClose} className={T.btnGhost}>
+            Later
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { examApi } from "../lib/examApi";
 import { T } from "../lib/examTheme";
-import { FeedbackButton } from "./FeedbackButton";
+import { FeedbackButton, FeedbackDialog } from "./FeedbackButton";
+import { feedbackGiven } from "../lib/feedback";
 
 const FILTERS = [
   ["all", "All"],
@@ -61,6 +62,7 @@ export default function ResultsTab() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(null); // candidate_id whose sheet is open
   const [error, setError] = useState("");
+  const [showFb, setShowFb] = useState(false); // feedback popup after the CSV download
 
   useEffect(() => {
     examApi
@@ -112,7 +114,11 @@ export default function ResultsTab() {
           </select>
           <button onClick={load} className={T.btnGhost}>↻ Refresh</button>
           <button
-            onClick={() => report && downloadCsv(report, rows)}
+            onClick={() => {
+              if (!report) return;
+              downloadCsv(report, rows);
+              if (!feedbackGiven("hr", "hr-v2")) setShowFb(true);
+            }}
             disabled={!report}
             title="Downloads the students currently shown (filters apply)"
             className={T.btnGhost}
@@ -120,7 +126,7 @@ export default function ResultsTab() {
             ⬇ Download CSV
           </button>
           <span className="ml-auto" />
-          <FeedbackButton role="hr" userId="hr" />
+          <FeedbackButton role="hr" userId="hr-v2" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -193,6 +199,8 @@ export default function ResultsTab() {
         </table>
       </section>
 
+      {showFb && <FeedbackDialog role="hr" userId="hr-v2" onClose={() => setShowFb(false)} />}
+
       {open && <SheetModal paperId={paperId} cid={open} onClose={() => { setOpen(null); load(); }} />}
     </div>
   );
@@ -228,7 +236,7 @@ function SheetModal({ paperId, cid, onClose }) {
         {d?.items.map((it) => (
           <QuestionCard key={it.q_no} it={it} paperId={paperId} cid={cid} onSaved={setD} />
         ))}
-        <div className="flex justify-end"><FeedbackButton role="hr" userId="hr" /></div>
+        <div className="flex justify-end"><FeedbackButton role="hr" userId="hr-v2" /></div>
       </div>
     </div>
   );
