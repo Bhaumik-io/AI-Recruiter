@@ -26,6 +26,7 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
   const [matched, setMatched] = useState(false);
   const [matchMsg, setMatchMsg] = useState("");
   const [tries, setTries] = useState(0);
+  const [attempt, setAttempt] = useState(0); // bumped by "Retry camera"
 
   // fullscreen state
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
         const live = stream?.getVideoTracks()[0]?.readyState === "live";
         setCamera(live);
         if (!live) {
-          setCameraMsg("The camera stopped. Unplug/replug it or allow it again, then refresh this page.");
+          setCameraMsg("The camera stopped. Unplug/replug it or allow it again, then press Retry camera.");
           return;
         }
         const dets = await faceapi.detectAllFaces(v, OPTS);
@@ -117,20 +118,64 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
       }
     }
 
-    (async () => {
+    const stopStream = (st) => st?.getTracks().forEach((t) => t.stop());
+    const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    // the face-check files are downloaded from this site; retry a few times on a weak connection
+    async function loadModels() {
+      for (let i = 0; i < 3; i++) {
+        try {
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          ]);
+          return;
+        } catch {
+          if (cancelled) return;
+          setCameraMsg(`Downloading the face-check files… (try ${i + 2} of 3)`);
+          await pause(1500 * (i + 1));
+        }
+      }
+      throw Object.assign(new Error("Could not download the face-check files. Check your internet, then press Retry camera."), { name: "ModelLoadError" });
+    }
+
+    async function openCamera() {
       try {
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-        ]);
-        if (cancelled) return;
-        setModelsReady(true);
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        return await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+      } catch (e) {
+        if (e?.name === "OverconstrainedError" || e?.name === "TypeError") {
+          return navigator.mediaDevices.getUserMedia({ video: true }); // camera that cannot do 640x480
+        }
+        throw e;
+      }
+    }
+
+    (async () => {
+      let camStream = null;
+      try {
+        setCamera(false);
+        setCameraMsg("Starting camera…");
+        // ask for the camera and download the models at the same time (saves several seconds)
+        const camPromise = openCamera().then(
+          (st) => ({ st }),
+          (err) => ({ err })
+        );
+        try {
+          await loadModels();
+        } catch (e) {
+          stopStream((await camPromise).st);
+          throw e;
+        }
+        const cam = await camPromise;
+        camStream = cam.st || null;
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stopStream(camStream);
           return;
         }
+        setModelsReady(true);
+        if (!camStream) throw cam.err;
+        stream = camStream;
         const v = videoRef.current;
         v.srcObject = stream;
         await v.play().catch(() => {});
@@ -138,15 +183,22 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
         setCameraMsg("Camera is working.");
         stream.getVideoTracks()[0].addEventListener("ended", () => {
           setCamera(false);
-          setCameraMsg("The camera stopped. Reconnect it and refresh this page.");
+          setCameraMsg("The camera stopped. Reconnect it and press Retry camera.");
         });
         timer = setInterval(loop, LOOP_MS);
       } catch (e) {
         setCamera(false);
+        const n = e?.name;
         setCameraMsg(
-          e?.name === "NotAllowedError"
-            ? "Camera permission was blocked. Click the camera icon in the address bar, allow it, then refresh."
-            : "Could not start the camera: " + (e?.message || "unknown error")
+          n === "NotAllowedError" || n === "SecurityError"
+            ? "Camera permission was blocked. Click the camera icon in the address bar, choose Allow, then press Retry camera."
+            : n === "NotReadableError" || n === "TrackStartError"
+              ? "The camera is being used by another app or browser tab (Zoom, Meet, Teams, camera app). Close it, then press Retry camera."
+              : n === "NotFoundError" || n === "DevicesNotFoundError"
+                ? "No camera was found. Connect or enable a camera, then press Retry camera."
+                : n === "ModelLoadError"
+                  ? e.message
+                  : "Could not start the camera: " + (e?.message || "unknown error") + ". Press Retry camera."
         );
       }
     })();
@@ -156,7 +208,7 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
       clearInterval(timer);
       stream?.getTracks().forEach((t) => t.stop()); // AntiCheatMonitor opens its own stream
     };
-  }, []);
+  }, [attempt]);
 
   const allOk = camera && screenOk && fullscreen && faceOk && matched;
 
@@ -177,7 +229,18 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
           className="h-40 w-52 shrink-0 rounded-lg border border-[#1c2230] bg-black object-cover [transform:scaleX(-1)]"
         />
         <ul className="flex-1 space-y-2 text-xs">
-          <Row ok={modelsReady && camera} label="Camera is working" hint={cameraMsg} />
+          <Row
+            ok={modelsReady && camera}
+            label="Camera is working"
+            hint={cameraMsg}
+            action={
+              !camera && (
+                <button className={T.btnLink} onClick={() => setAttempt((a) => a + 1)}>
+                  Retry camera
+                </button>
+              )
+            }
+          />
           <Row ok={screenOk} label="Entire screen is being shared" hint="Sharing stopped or a window was shared. Refresh and share the ENTIRE screen." />
           <Row
             ok={fullscreen}
