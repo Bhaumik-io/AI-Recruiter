@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { hrApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -9,8 +9,27 @@ export default function HRLogin() {
   const [form, setForm] = useState({ email: '', password: '', name: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
+  const infoRef = useRef(null)
   const { loginHR } = useAuth()
   const navigate = useNavigate()
+
+  // Close the info popup when clicking outside it or pressing Escape
+  useEffect(() => {
+    if (!showInfo) return
+    function onClick(e) {
+      if (infoRef.current && !infoRef.current.contains(e.target)) setShowInfo(false)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setShowInfo(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showInfo])
 
   async function submit(e) {
     e.preventDefault()
@@ -50,18 +69,29 @@ export default function HRLogin() {
             ← Back to home
           </Link>
 
-          <div className="relative group">
+          <div className="relative" ref={infoRef}>
             <button
               type="button"
-              className="w-6 h-6 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-slate-700 hover:border-slate-500 transition-colors"
+              onClick={() => setShowInfo((v) => !v)}
+              aria-expanded={showInfo}
+              className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+                showInfo
+                  ? 'bg-slate-700 border-slate-500'
+                  : 'bg-slate-800 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
+              }`}
               aria-label="Info about HR credentials"
             >
               <span className="text-xs font-bold text-slate-300 leading-none">i</span>
             </button>
-            <div className="hidden group-hover:block absolute right-0 top-8 w-64 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs leading-relaxed text-slate-300 shadow-2xl z-20">
-              HR ID and pass can only be set and accessed from the software's .env file only for security purpose.
-              <div className="absolute -top-1 right-2.5 w-2 h-2 bg-slate-800 border-l border-t border-slate-700 rotate-45"></div>
-            </div>
+            {showInfo && (
+              <div
+                role="dialog"
+                className="absolute right-0 top-8 w-64 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs leading-relaxed text-slate-300 shadow-2xl z-20"
+              >
+                HR ID and pass can only be set and accessed from the software's .env file only for security purpose.
+                <div className="absolute -top-1 right-2.5 w-2 h-2 bg-slate-800 border-l border-t border-slate-700 rotate-45"></div>
+              </div>
+            )}
           </div>
         </div>
 
