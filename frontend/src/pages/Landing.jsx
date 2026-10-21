@@ -46,7 +46,7 @@ export default function Landing() {
         </Card>
       </div>
 
-      <span className="fixed bottom-3 right-4 text-[8px] tracking-wide text-slate-600 select-none pointer-events-none">
+      <span className="fixed bottom-3 right-4 text-[10px] tracking-wide text-slate-600 select-none pointer-events-none">
         Made by Bhaumik
       </span>
     </div>

@@ -123,9 +123,10 @@ export default function CandidateLogin() {
             <input className="input" placeholder="Access code (from your email / SMS) or Candidate ID" required
               value={form.candidate_id} onChange={(e) => setForm({ ...form, candidate_id: e.target.value })} />
           )}
-          <input className="input" type="email" placeholder="Email" required value={form.email}
+          <input className="input" type="email" autoComplete="email" placeholder="Email" required value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input className="input" type="password" placeholder="New Password" required value={form.password}
+          <input className="input" type="password" placeholder={mode === 'signup' ? 'Create a password (8+ chars, letters + numbers)' : 'Password'}
+            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })} />
 
           {mode === 'signup' && (
