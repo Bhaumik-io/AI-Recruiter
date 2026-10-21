@@ -230,7 +230,7 @@ export default function CandidateExam() {
   // poll while the AI is scoring
   useEffect(() => {
     if (data?.submission?.status !== "scoring") return;
-    const t = setInterval(load, 4000);
+    const t = setInterval(load, 8000);
     return () => clearInterval(t);
   }, [data?.submission?.status]);
 
