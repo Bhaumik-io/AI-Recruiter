@@ -100,6 +100,7 @@ export default function ResultsTab() {
 
   return (
     <div className="space-y-5">
+      <ResetPassword />
       {error && <div className={T.error}>{error}</div>}
 
       <section className={`${T.card} !space-y-3`}>
@@ -203,6 +204,36 @@ export default function ResultsTab() {
 
       {open && <SheetModal paperId={paperId} cid={open} onClose={() => { setOpen(null); load(); }} />}
     </div>
+  );
+}
+
+function ResetPassword() {
+  const [who, setWho] = useState("");
+  const [pw, setPw] = useState("");
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true); setErr(""); setRes(null);
+    try { setRes(await examApi.resetStudentPassword(who, pw)); } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  return (
+    <details className="rounded-lg border border-[#1c2230] p-3">
+      <summary className="cursor-pointer text-sm text-[#8a93a6]">Student forgot password?</summary>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input className={T.input} placeholder="Student email or roll no" value={who} onChange={(e) => setWho(e.target.value)} />
+        <input className={T.input} placeholder="New password (blank = auto)" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <button disabled={busy || !who.trim()} className={T.btnGold} onClick={go}>{busy ? "Please wait…" : pw.trim() ? "Set this password" : "Generate password"}</button>
+      </div>
+      {err && <div className={T.error + " mt-2"}>{err}</div>}
+      {res && (
+        <div className="mt-2 text-sm text-white">
+          {res.email}: <b className="select-all font-mono">{res.temp_password}</b>
+          <span className="text-[#8a93a6]"> — {res.emailed ? "also emailed to the student." : "email not sent, tell the student yourself."}</span>
+        </div>
+      )}
+    </details>
   );
 }
 

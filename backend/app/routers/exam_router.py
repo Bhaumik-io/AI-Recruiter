@@ -6,6 +6,7 @@ Auth comes from exam_deps.py, which decodes your JWTs via app/core/auth.py.
 import json
 import math
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -492,6 +493,67 @@ def hr_reset_score(paper_id: str, candidate_id: str, body: ScoreEditBody, hr=Dep
     total = round(sum(x["score"] for x in results), 2)
     st.submissions.update_one(key, {"$set": {"results": results, "total_score": total}})
     return _hr_detail(p, {**sub, "results": results, "total_score": total})
+
+
+class ResetPwBody(BaseModel):
+    who: str  # the student's email or roll number
+    password: str = ""  # optional: HR's own choice; blank = auto-generate
+
+
+@router.post("/students/reset-password")
+def hr_reset_student_password(body: ResetPwBody, hr=Depends(get_current_hr)):
+    """HR-only. Gives a student who forgot their password a new temporary one.
+    Face check, device lock and proctoring are untouched: the student still has
+    to pass the face match after logging in."""
+    import secrets
+    from app.auth import hash_password
+
+    q = body.who.strip()
+    if not q:
+        raise HTTPException(400, "Enter the student's email or roll number")
+    row = app_storage.get_candidate_auth_by_email(q) if "@" in q else None
+    if not row and invite_storage is not None:
+        inv = invite_storage.invites.find_one(
+            {"roll": {"$regex": f"^{re.escape(q)}$", "$options": "i"}}, st.NO_ID
+        )
+        if inv:
+            row = app_storage.get_candidate_auth(inv["invite_id"])
+    if not row or not row.get("password_hash"):
+        raise HTTPException(404, "No signed-up student found. If they never signed up, just resend their code.")
+    custom = body.password.strip()
+    if custom:
+        from app.routers.auth_router import _check_password
+        _check_password(custom, row.get("email") or "")  # same strength rules as sign-up
+        temp = custom
+    else:
+        temp = "".join(secrets.choice("abcdefghjkmnpqrstuvwxyz") for _ in range(4)) + "".join(secrets.choice("23456789") for _ in range(4))
+    app_storage.upsert_candidate_auth(row["id"], password_hash=hash_password(temp))
+    mailed = False
+    try:  # best effort: the page always shows the password too, in case mail is down
+        from email.message import EmailMessage
+        from app.core import invite_service as svc
+
+        cfg = svc.email_config()
+        if cfg and row.get("email"):
+            m = EmailMessage()
+            m["Subject"] = "Your exam portal password was reset"
+            m["From"] = cfg["from"]
+            m["To"] = row["email"]
+            m.set_content(
+                f"Hello,\n\nYour password for the exam portal has been reset by HR.\n\n"
+                f"Email: {row['email']}\nNew password: {temp}\n\n"
+                f"Log in with it (the face check still applies). Do not share this password."
+            )
+            smtp = svc.smtp_open(cfg)
+            smtp.send_message(m)
+            try:
+                smtp.quit()
+            except Exception:
+                pass
+            mailed = True
+    except Exception as e:
+        print(f"[reset-password] email failed: {e}")
+    return {"email": row.get("email"), "candidate_id": row["id"], "temp_password": temp, "emailed": mailed}
 
 
 # ---------------------------------------------------------------- candidate side
