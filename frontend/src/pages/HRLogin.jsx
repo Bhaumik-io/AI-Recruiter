@@ -59,7 +59,7 @@ export default function HRLogin() {
               <span className="text-xs font-bold text-slate-300 leading-none">i</span>
             </button>
             <div className="hidden group-hover:block absolute right-0 top-8 w-64 p-3 rounded-xl bg-slate-800 border border-slate-700 text-xs leading-relaxed text-slate-300 shadow-2xl z-20">
-              HR ID and pass can only be set and accessed from the software\'s .env file only for security purpose.
+              HR ID and pass can only be set and accessed from the software's .env file only for security purpose.
               <div className="absolute -top-1 right-2.5 w-2 h-2 bg-slate-800 border-l border-t border-slate-700 rotate-45"></div>
             </div>
           </div>
