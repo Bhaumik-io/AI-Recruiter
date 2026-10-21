@@ -21,3 +21,11 @@ export function popupSeen(id) {
 export function markPopupSeen(id) {
   try { localStorage.setItem(pk(id), '1') } catch { /* ignore */ }
 }
+
+// To see the feedback popups / buttons as "new" again: open any page of the site with ?resetfeedback=1
+// at the end of the address (for example https://your-site.vercel.app/hr/question-gen?resetfeedback=1).
+try {
+  if (new URLSearchParams(window.location.search).has('resetfeedback')) {
+    Object.keys(localStorage).filter((k) => k.startsWith('feedback_')).forEach((k) => localStorage.removeItem(k))
+  }
+} catch { /* ignore */ }
