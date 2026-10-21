@@ -9,6 +9,7 @@ grounding for reference answers is OFF unless USE_SEARCH_GROUNDING=true
 """
 import json
 import os
+import random
 import re
 import threading
 import time
@@ -22,7 +23,7 @@ _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # cap simultaneous Gemini calls so 100 students submitting together
 # don't blow through rate limits
-_sem = threading.Semaphore(int(os.getenv("GEMINI_CONCURRENCY", "4")))
+_sem = threading.Semaphore(int(os.getenv("GEMINI_CONCURRENCY", "8")))
 
 JSON_CFG = types.GenerateContentConfig(
     response_mime_type="application/json", temperature=0.4
@@ -38,15 +39,22 @@ PAPER_CFG = types.GenerateContentConfig(
 LETTERS = "ABCD"
 
 
-def _call(fn, tries: int = 4):
+def _call(fn, tries: int = 5):
     for i in range(tries):
         try:
+            t_wait = time.time()
             with _sem:
-                return fn()
-        except Exception:
+                t_run = time.time()
+                out = fn()
+            took, waited = time.time() - t_run, t_run - t_wait
+            if took > 20 or waited > 20:  # shows up in the Render logs if Gemini is the slow part
+                print(f"[gemini] call took {took:.0f}s after waiting {waited:.0f}s for a free slot", flush=True)
+            return out
+        except Exception as e:
             if i == tries - 1:
                 raise
-            time.sleep(2 ** i)
+            print(f"[gemini] attempt {i + 1} failed ({type(e).__name__}); retrying", flush=True)
+            time.sleep(min(30, 3 * 2 ** i) + random.random())  # 3s, 6s, 12s, 24s + jitter
 
 
 def _parse_json(text: str):
@@ -318,6 +326,13 @@ Return ONLY a JSON array (no markdown):
 #    MCQs are marked instantly in code (no Gemini); everything else is
 #    graded by Gemini in a single call.
 # --------------------------------------------------------------------------
+def _norm(text) -> str:
+    """lower-case, drop punctuation and extra spaces, so 'The Hypervisor.' == 'hypervisor'."""
+    t = re.sub(r"[^\w\s]", " ", str(text or "").lower())
+    t = re.sub(r"\b(the|a|an)\b", " ", t)
+    return " ".join(t.split())
+
+
 def score_submission(paper: dict, answers: dict[str, str]) -> list[dict]:
     results: list[dict] = []
     items = []
@@ -334,6 +349,14 @@ def score_submission(paper: dict, answers: dict[str, str]) -> list[dict]:
                     "missing_points": [],
                 }
             )
+            continue
+        if not given:  # blank: always 0, no need to ask Gemini
+            results.append({"q_no": q["q_no"], "score": 0.0, "feedback": "No answer.", "missing_points": []})
+            continue
+        if q.get("type") == "fill" and _norm(given) == _norm(q.get("answer", "")) and _norm(given):
+            # exact match (ignoring case / punctuation): full marks without a Gemini call.
+            # Anything that does not match exactly still goes to Gemini (synonyms, spelling slips).
+            results.append({"q_no": q["q_no"], "score": float(q["marks"]), "feedback": "Correct.", "missing_points": []})
             continue
         items.append(
             {

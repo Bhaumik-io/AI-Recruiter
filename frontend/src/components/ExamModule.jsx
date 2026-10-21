@@ -5,6 +5,30 @@ import { T } from "../lib/examTheme";
 
 const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm";
 
+// ---- access-code CSV (for when e-mail does not arrive: share the codes yourself)
+const csvCell = (v) => {
+  let t = v == null ? "" : String(v);
+  // stop spreadsheets from running text as a formula; keep normal phone numbers like +91 98765 43210
+  if (/^[=@\t\r]/.test(t) || (/^[+\-]/.test(t) && !/^[+\-][\d\s()-]+$/.test(t))) t = "'" + t;
+  return `"${t.replace(/"/g, '""')}"`;
+};
+
+function downloadCodesCsv(view) {
+  const state = (r) =>
+    r.used ? "Signed up" : r.status === "sent" ? "Code sent" : r.status === "failed" ? "Sending failed" : r.status === "queued" ? "Sending" : "Not sent yet";
+  const head = ["Sr No", "Name", "Roll No", "Email", "Phone", "Access Code", "Status"];
+  const lines = [head.map(csvCell).join(",")];
+  view.invites.forEach((r, i) => {
+    lines.push([i + 1, r.name, r.roll, r.email, r.phone, r.code, state(r)].map(csvCell).join(","));
+  });
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${(view.filename || "students").replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "_")}_access_codes.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export default function ExamModule() {
   const [file, setFile] = useState(null);
   const [batch, setBatch] = useState(null);
@@ -122,9 +146,14 @@ export default function ExamModule() {
                   .join(" · ")}
               </div>
             </div>
-            <button onClick={() => setDialog(true)} disabled={!!busy} className={T.btnGold}>
-              Send access codes…
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <button onClick={() => downloadCodesCsv(batch)} className={T.btnGhost} title="Download every student's access code as a CSV file">
+                ⬇ Download codes (CSV)
+              </button>
+              <button onClick={() => setDialog(true)} disabled={!!busy} className={T.btnGold}>
+                Send access codes…
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -210,6 +239,9 @@ export default function ExamModule() {
                 <div className="space-x-3">
                   <button className={T.btnLink} onClick={() => openBatch(b.batch_id)}>
                     Open
+                  </button>
+                  <button className={T.btnLink} onClick={() => run("Preparing CSV…", async () => downloadCodesCsv(await inviteApi.get(b.batch_id)))}>
+                    Codes CSV
                   </button>
                   <button className={T.btnDanger} onClick={() => deleteBatch(b.batch_id)}>
                     Delete

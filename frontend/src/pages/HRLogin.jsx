@@ -63,6 +63,9 @@ export default function HRLogin() {
           <button disabled={busy} className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-medium disabled:opacity-40">
             {busy ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Sign up'}
           </button>
+          <p className={`text-xs ${busy ? 'text-amber-300' : 'text-slate-500'}`}>
+            ⏳ Login can take up to a minute when the server is busy. Please wait and do not refresh the page or click again.
+          </p>
         </form>
         {/*<button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
           className="text-sm text-slate-400 hover:text-slate-200 mt-4">

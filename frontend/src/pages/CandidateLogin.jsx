@@ -87,6 +87,9 @@ export default function CandidateLogin() {
             onSuccess={onFaceSuccess}
             onError={setError}
           />
+          <p className="text-xs text-slate-500 mt-3">
+            Allow camera access and face the light. Loading the camera can take a moment: please wait and do not refresh.
+          </p>
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
           <button
             onClick={goBackToPassword}
@@ -137,6 +140,9 @@ export default function CandidateLogin() {
             {busy ? 'Please wait...' : mode === 'signup' ? 'Continue to face enrollment →' : 'Continue to face verification →'}
           </button>
         </form>
+        <p className={`text-xs mt-2 ${busy ? 'text-amber-300' : 'text-slate-500'}`}>
+          ⏳ This can take up to a minute when many students are online. Please wait and do not refresh the page or click again.
+        </p>
         <p className="text-xs text-slate-500 mt-3">
           {mode === 'signup'
             ? "Step 1 of 2 — password sets up your account, face enrollment (next) is required to finish."

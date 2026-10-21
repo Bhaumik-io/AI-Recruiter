@@ -16,7 +16,11 @@ SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-change-me-in-.env")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60 * 12  # 12 hours
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt "cost" (rounds). 12 is passlib's default; 10 is ~4x faster and still a normal setting. On the
+# free host's tiny CPU, hashing was the main reason sign-up / login queued up when 50 students arrived.
+# Existing accounts keep working (each stored hash remembers its own cost). Override with BCRYPT_ROUNDS.
+BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "10"))
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=BCRYPT_ROUNDS)
 
 
 def hash_password(password: str) -> str:
