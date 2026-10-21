@@ -11,6 +11,7 @@ import ConferenceRoom from './pages/ConferenceRoom'
 import QuestionGenModule from './components/QuestionGenModule'
 import CandidateExam from './components/CandidateExam'
 import SlowNotice from './components/SlowNotice'
+import HelpButton from './components/HelpButton'
 import ExamModule from './components/ExamModule'
 import { EXAM_ONLY } from './lib/mode'
 
@@ -20,6 +21,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <SlowNotice />
+        <HelpButton />
         {/* <DevResetButton /> */}
         <Routes>
           <Route path="/" element={<Landing />} />
