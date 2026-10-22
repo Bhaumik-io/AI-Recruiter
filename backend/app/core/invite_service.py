@@ -155,6 +155,12 @@ def parse_students(rows: list[list[str]]) -> dict:
 
 # ------------------------------------------------------------------ email
 def email_config():
+    mj_key, mj_secret = os.getenv("MAILJET_API_KEY"), os.getenv("MAILJET_SECRET_KEY")
+    if mj_key and mj_secret and os.getenv("MAIL_ENABLED", "true").lower() == "true":
+        sender = os.getenv("SMTP_FROM") or os.getenv("GMAIL_ADDRESS") or ""
+        if sender:
+            return {"api": True, "provider": "mailjet", "api_key": mj_key, "api_secret": mj_secret,
+                    "host": "api.mailjet.com", "port": 443, "user": sender, "password": "", "from": sender}
     api_key = os.getenv("BREVO_API_KEY")
     if api_key and os.getenv("MAIL_ENABLED", "true").lower() == "true":
         sender = os.getenv("SMTP_FROM") or os.getenv("GMAIL_ADDRESS") or ""
@@ -191,7 +197,44 @@ class _ApiMailer:
     def __init__(self, cfg):
         self.cfg = cfg
 
+    def _send_mailjet(self, msg):
+        import base64 as _b64
+        name, addr = _parseaddr(str(msg["From"] or self.cfg["from"]))
+        to_name, to_addr = _parseaddr(str(msg["To"]))
+        html_part = msg.get_body(preferencelist=("html",))
+        text_part = msg.get_body(preferencelist=("plain",))
+        m = {
+            "From": {"Email": addr, "Name": name or "Exam Team"},
+            "To": [{"Email": to_addr, **({"Name": to_name} if to_name else {})}],
+            "Subject": str(msg["Subject"] or ""),
+        }
+        if text_part is not None:
+            m["TextPart"] = text_part.get_content()
+        if html_part is not None:
+            m["HTMLPart"] = html_part.get_content()
+        token = _b64.b64encode(f"{self.cfg['api_key']}:{self.cfg['api_secret']}".encode()).decode()
+        req = urllib.request.Request(
+            "https://api.mailjet.com/v3.1/send",
+            data=_json.dumps({"Messages": [m]}).encode(),
+            method="POST",
+            headers={"Authorization": "Basic " + token, "content-type": "application/json"},
+        )
+        try:
+            body = urllib.request.urlopen(req, timeout=30).read().decode(errors="ignore")
+        except urllib.error.HTTPError as e:
+            raise ApiMailError(f"Mailjet {e.code}: {e.read().decode(errors='ignore')[:300]}")
+        except Exception as e:
+            raise ApiMailError(f"Mailjet request failed: {e}")
+        try:
+            st = _json.loads(body)["Messages"][0]["Status"]
+        except Exception:
+            st = "success"
+        if st != "success":
+            raise ApiMailError(f"Mailjet rejected the message: {body[:300]}")
+
     def send_message(self, msg):
+        if self.cfg.get("provider") == "mailjet":
+            return self._send_mailjet(msg)
         name, addr = _parseaddr(str(msg["From"] or self.cfg["from"]))
         to_name, to_addr = _parseaddr(str(msg["To"]))
         html_part = msg.get_body(preferencelist=("html",))
