@@ -25,14 +25,25 @@ frontend/src/index.css for the same palette. Keep the two in sync if you
 change the site's colors.
 """
 
+import base64
+import json
 import os
 import smtplib
+import urllib.error
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
-MAIL_ENABLED = os.getenv("MAIL_ENABLED", "true").lower() == "true" and bool(GMAIL_ADDRESS) and bool(GMAIL_APP_PASSWORD)
+# HTTPS mail (Mailjet): works on hosts that block SMTP, e.g. Render's free tier.
+# Set MAILJET_API_KEY + MAILJET_SECRET_KEY and the sender (SMTP_FROM, or GMAIL_ADDRESS) in the environment.
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY", "")
+MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY", "")
+MAIL_FROM = os.getenv("SMTP_FROM") or GMAIL_ADDRESS
+USE_MAILJET = bool(MAILJET_API_KEY and MAILJET_SECRET_KEY and MAIL_FROM)
+_MAIL_ON = os.getenv("MAIL_ENABLED", "true").lower() == "true"
+MAIL_ENABLED = _MAIL_ON and (USE_MAILJET or (bool(GMAIL_ADDRESS) and bool(GMAIL_APP_PASSWORD)))
 
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587  # STARTTLS
@@ -131,12 +142,43 @@ def _hairline() -> str:
     return f'<div style="height:1px;background-color:{BORDER};margin:22px 0;"></div>'
 
 
+def _send_mailjet(to_email: str, subject: str, plain_text: str, html: str):
+    payload = {"Messages": [{
+        "From": {"Email": MAIL_FROM, "Name": "AI Recruiter"},
+        "To": [{"Email": to_email}],
+        "Subject": subject,
+        "TextPart": plain_text,
+        "HTMLPart": html,
+    }]}
+    token = base64.b64encode(f"{MAILJET_API_KEY}:{MAILJET_SECRET_KEY}".encode()).decode()
+    req = urllib.request.Request(
+        "https://api.mailjet.com/v3.1/send",
+        data=json.dumps(payload).encode(),
+        method="POST",
+        headers={"Authorization": "Basic " + token, "content-type": "application/json"},
+    )
+    try:
+        body = urllib.request.urlopen(req, timeout=30).read().decode(errors="ignore")
+        status = json.loads(body)["Messages"][0]["Status"]
+    except urllib.error.HTTPError as e:
+        raise MailSendError(f"Mailjet {e.code}: {e.read().decode(errors='ignore')[:300]}") from e
+    except (KeyError, IndexError, ValueError):
+        status = "success"  # unexpected reply shape but HTTP 200
+    except Exception as e:
+        raise MailSendError(f"Mailjet request failed: {e}") from e
+    if status != "success":
+        raise MailSendError(f"Mailjet rejected the message: {body[:300]}")
+
+
 def _send(to_email: str, subject: str, plain_text: str, html: str):
     if not MAIL_ENABLED:
         raise MailNotConfigured(
             "Email sending isn't configured — set GMAIL_ADDRESS and "
             "GMAIL_APP_PASSWORD in backend/.env (see mailer.py header for steps)."
         )
+    if USE_MAILJET:
+        _send_mailjet(to_email, subject, plain_text, html)
+        return
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = GMAIL_ADDRESS
