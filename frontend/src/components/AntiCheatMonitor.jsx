@@ -5,6 +5,14 @@ import { candidateApi } from '../api/client'
 const MODEL_URL = '/models'
 const CHECK_INTERVAL_MS = 500
 const MAX_WARNINGS = 3
+// The first seconds after the exam opens are chaotic: the camera is still starting, the browser shows its
+// "sharing your screen" bar, focus jumps around. Window/tab/fullscreen/face events are ignored during this
+// grace period so a slow camera can never cost a student strikes before they have even seen question 1.
+const STARTUP_GRACE_MS = 10000
+// A webcam can hand over dark/blank frames for a while after it opens (slow lab PCs especially). "No face"
+// is not counted until a face has been seen once, or this long after the camera opened, whichever is first.
+const FIRST_FACE_WAIT_MS = 30000
+const GRACE_EVENTS = new Set(['tab_blur', 'window_blur', 'fullscreen_exit', 'dev_tools_opened', 'no_face', 'looking_away', 'multiple_faces', 'screen_share_not_full'])
 // Larger inputSize = more accurate landmark localization (matters for the
 // gaze heuristic), at some extra CPU cost per 2s tick — worth it for a
 // proctoring context where accuracy beats raw speed.
@@ -67,6 +75,14 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
   const lastVerifyRef = useRef(Date.now())
   const verifyBusyRef = useRef(false)
   const mismatchRef = useRef(0)
+  const mountedAtRef = useRef(Date.now())
+  const cameraReadyAtRef = useRef(0)
+  const faceSeenRef = useRef(false)
+  const [starting, setStarting] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setStarting(false), FIRST_FACE_WAIT_MS)
+    return () => clearTimeout(t)
+  }, [])
 
   function pushWarning(text) {
     setWarnings((w) => [...w.slice(-4), { text, at: new Date().toLocaleTimeString() }])
@@ -78,6 +94,9 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
   // actually logged as a strike.
   async function report(eventType, severity, uiText, detail = '', { beacon = false } = {}) {
     if (terminatedRef.current) return
+    // startup grace: do not count (or show) noisy events while the camera / browser settle.
+    // A real "camera stopped" or "screen share stopped" still counts.
+    if (Date.now() - mountedAtRef.current < STARTUP_GRACE_MS && GRACE_EVENTS.has(eventType) && detail !== 'camera lost') return
     // throttle identical event types so a flaky webcam frame doesn't spam
     // the log, but tight enough for a strict interview: repeated real
     // violations of the same kind can still rack up strikes quickly.
@@ -131,12 +150,32 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
     // instead of attaching it to a video element that's already gone.
     let cancelled = false
 
+    const load = (net) => (net.isLoaded ? Promise.resolve() : net.loadFromUri(MODEL_URL))
+    // Open the camera and load the models at the same time (was one after the other), and retry the
+    // camera a few times: right after the readiness check the webcam can still be "busy" for a moment.
+    const openCamera = async () => {
+      let last
+      for (let i = 0; i < 4; i++) {
+        if (cancelled) throw new Error('cancelled')
+        try {
+          return await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 480 }, height: { ideal: 360 } } })
+        } catch (e) {
+          last = e
+          if (e.name === 'NotAllowedError' || e.name === 'NotFoundError') break
+          await new Promise((r) => setTimeout(r, 700))
+        }
+      }
+      throw last
+    }
     Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      ...(verifyFn ? [faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)] : []),
+      Promise.all([
+        load(faceapi.nets.tinyFaceDetector),
+        load(faceapi.nets.faceLandmark68Net),
+        ...(verifyFn ? [load(faceapi.nets.faceRecognitionNet)] : []),
+      ]),
+      openCamera(),
     ])
-      .then(() => navigator.mediaDevices.getUserMedia({ video: {} }))
+      .then(([, s]) => s)
       .then((s) => {
         if (cancelled) {
           s.getTracks().forEach((t) => t.stop())
@@ -144,6 +183,7 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
         }
         stream = s
         if (videoRef.current) videoRef.current.srcObject = s
+        cameraReadyAtRef.current = Date.now()
         cameraCbRef.current?.(true)
         s.getVideoTracks()[0]?.addEventListener('ended', () => {
           if (!cameraLostRef.current) {
@@ -153,14 +193,24 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
           }
         })
 
+        let tickBusy = false
         intervalId = setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 3) return
+          if (tickBusy || !videoRef.current || videoRef.current.readyState < 3) return
+          tickBusy = true
+          try {
           const detections = await faceapi.detectAllFaces(
             videoRef.current,
             DETECTOR_OPTIONS
           )
 
-          if (detections.length === 0) {
+          if (detections.length > 0 && !faceSeenRef.current) {
+            faceSeenRef.current = true
+            setStarting(false)
+          }
+          if (detections.length === 0 && !faceSeenRef.current && Date.now() - cameraReadyAtRef.current < FIRST_FACE_WAIT_MS) {
+            // camera still warming up: do not count this as "no face"
+            noFaceStreakRef.current = 0
+          } else if (detections.length === 0) {
             multiFaceStreakRef.current = 0
             lookingAwayStreakRef.current = 0
             noFaceStreakRef.current += 1
@@ -231,6 +281,11 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
                 lookingAwayStreakRef.current = 0
               }
             }
+          }
+          } catch (e) {
+            console.warn('Proctoring tick failed', e)
+          } finally {
+            tickBusy = false
           }
         }, CHECK_INTERVAL_MS)
       })
@@ -331,6 +386,11 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
     <div className="fixed bottom-4 right-4 w-56 z-50 flex flex-col items-end gap-2">
       <video ref={videoRef} autoPlay muted playsInline
         className="w-40 h-28 object-cover rounded-lg border-2 border-slate-700 shadow-lg opacity-90" />
+      {starting && (
+        <div className="text-[11px] bg-slate-800/80 border border-slate-600 text-slate-300 px-2 py-1 rounded">
+          Camera is starting. Warnings are paused until your face is found (up to 30 s).
+        </div>
+      )}
       {warningCount > 0 && (
         <div className="text-xs font-semibold bg-red-500/20 border border-red-500/40 text-red-300 px-2 py-1 rounded">
           ⚠ Cheating warning {warningCount}/{MAX_WARNINGS} — 3rd strike auto-ends the {label}
