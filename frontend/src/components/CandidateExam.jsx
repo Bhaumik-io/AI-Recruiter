@@ -229,11 +229,6 @@ export default function CandidateExam() {
   }, [started, data?.submission]);
 
   // poll while the AI is scoring
-  useEffect(() => {
-    if (data?.submission?.status !== "scoring") return;
-    const t = setInterval(load, 8000);
-    return () => clearInterval(t);
-  }, [data?.submission?.status]);
 
   // "Your exam is submitted" stays until the exam window has closed (everyone is done)
   // plus 5 minutes, then the page goes back to "No exam is live right now".
@@ -258,6 +253,30 @@ export default function CandidateExam() {
       clearInterval(poll);
     };
   }, [showSubmitted, holdUntil]);
+
+  // Once submitted, going back (Alt+Left, browser Back, swipe) must not return to the exam:
+  // the student is logged out and sent to the home page, and has to sign in again.
+  const isSubmitted = !!data?.submission;
+  useEffect(() => {
+    if (!isSubmitted) return;
+    const kick = () => {
+      try {
+        logoutCandidate();
+      } catch {}
+      window.location.replace("/");
+    };
+    window.history.pushState({ submitted: true }, "", window.location.href);
+    window.history.pushState({ submitted: true }, "", window.location.href);
+    window.addEventListener("popstate", kick);
+    const onShow = (e) => {
+      if (e.persisted) kick(); // page restored from the back/forward cache
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => {
+      window.removeEventListener("popstate", kick);
+      window.removeEventListener("pageshow", onShow);
+    };
+  }, [isSubmitted]);
 
   if (!data)
     return (
@@ -300,34 +319,10 @@ export default function CandidateExam() {
         <div className={T.card}>
           <div className="text-2xl font-semibold text-white">✅ Your exam is submitted</div>
           <div className={T.muted}>
-            You can close this page once everyone has finished. Marks appear here after the exam window closes.
+            Please wait quietly until your teacher announces that everyone has finished. Your teacher will share the results.
           </div>
         </div>
-        {submission.status === "score_failed" && (
-          <div className={T.error}>Scoring hit a problem; your teacher will review it.</div>
-        )}
-        {submission.status === "scored" && submission.total_score != null && (
-          <>
-            <div className={T.card}>
-              <div className={T.muted}>Your score</div>
-              <div className="text-3xl font-semibold text-white">
-                {submission.total_score} <span className="text-base text-[#6b7385]">/ {submission.max_total}</span>
-              </div>
-            </div>
-            {submission.results.map((r) => (
-              <div key={r.q_no} className={T.card}>
-                <div className="text-xs font-semibold text-white">
-                  Q{r.q_no}. {r.question}{" "}
-                  <span className="font-normal text-[#c9962f]">
-                    ({r.score}/{r.max_marks})
-                  </span>
-                </div>
-                <div className={T.muted}>{r.feedback}</div>
-              </div>
-            ))}
-            <FeedbackPopup userId={candidateId} />
-          </>
-        )}
+        <FeedbackPopup userId={candidateId} />
         <div className="flex gap-2">
           <button onClick={() => setShowHistory((v) => !v)} className={T.btnGhost}>
             {showHistory ? "Hide history" : "History"}
@@ -587,11 +582,6 @@ function HistoryPanel() {
           </div>
           <div className="text-right">
             <div className="text-[#c9962f]">{r.status}</div>
-            {r.total_score != null && (
-              <div className="text-[#8a93a6]">
-                {r.total_score} / {r.max_total}
-              </div>
-            )}
           </div>
         </div>
       ))}

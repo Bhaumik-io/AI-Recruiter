@@ -715,20 +715,12 @@ def active_paper(bg: BackgroundTasks, request: Request, cand=Depends(get_current
             "phase": _phase(p, now),  # waiting | open | closed
             "server_now": now.isoformat(),
         },
+        # Students never receive marks, answers-vs-ideal or feedback: HR decides if and
+        # when to share results (class / WhatsApp). Only the fact that it was submitted.
         "submission": (
             {
-                "status": sub["status"],
+                "status": "submitted",
                 "submitted_at": sub.get("submitted_at"),
-                # Marks are shown only after the exam window closes, so nobody can
-                # read answers/feedback to a classmate who is still writing.
-                "total_score": sub.get("total_score") if _phase(p, now) == "closed" else None,
-                "max_total": sub.get("max_total"),
-                "results": [  # HR-only fields (AI mark, private note) are never sent to the student
-                    {k: v for k, v in r.items() if k not in ("ai_score", "note", "edited", "edited_at")}
-                    for r in sub.get("results", [])
-                ]
-                if _phase(p, now) == "closed"
-                else [],
                 "terminated": sub.get("terminated", False),
                 "termination_reason": sub.get("termination_reason", ""),
             }
@@ -740,19 +732,15 @@ def active_paper(bg: BackgroundTasks, request: Request, cand=Depends(get_current
 
 @router.get("/history")
 def my_history(cand=Depends(get_current_candidate)):
-    """This student's last 10 exams with their status. Marks appear only once
-    that exam's window has closed."""
+    """This student's last 10 exams with their status. Marks are never included."""
     cid = _cid(cand)
     now = _utcnow()
     rows = list(st.submissions.find({"candidate_id": cid}, st.NO_ID).sort("submitted_at", -1).limit(10))
     out = []
     for r in rows:
         p = st.papers.find_one({"paper_id": r["paper_id"]}, st.NO_ID)
-        closed = (not p) or (not p.get("is_active")) or _phase(p, now) == "closed"
         if r.get("terminated"):
             label = "Auto-submitted (proctoring)"
-        elif r.get("status") == "scored":
-            label = "Scored"
         else:
             label = "Submitted"
         out.append(
@@ -762,8 +750,6 @@ def my_history(cand=Depends(get_current_candidate)):
                 "subject": (p or {}).get("subject", ""),
                 "submitted_at": r.get("submitted_at"),
                 "status": label,
-                "total_score": r.get("total_score") if (closed and r.get("status") == "scored") else None,
-                "max_total": r.get("max_total"),
             }
         )
     return {"history": out}
