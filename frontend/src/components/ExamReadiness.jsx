@@ -58,6 +58,45 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
     let timer;
     let running = false;
     let single = 0; // consecutive frames with exactly one good face
+    let darkTicks = 0; // consecutive ticks where the picture is (nearly) black
+    let reopens = 0;
+    const probe = document.createElement("canvas");
+    probe.width = 32;
+    probe.height = 24;
+
+    // average brightness 0-255 of the current video frame
+    function brightness(v) {
+      try {
+        const c = probe.getContext("2d", { willReadFrequently: true });
+        c.drawImage(v, 0, 0, 32, 24);
+        const d = c.getImageData(0, 0, 32, 24).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+        return sum / (d.length / 4);
+      } catch {
+        return 255;
+      }
+    }
+
+    // Some webcams (HP Omen / Victus among them) report "working" but send black frames, especially
+    // right after screen sharing starts. Close and reopen the camera a few times before giving up.
+    async function reopenCamera() {
+      reopens += 1;
+      setCameraMsg("Camera picture is black. Restarting the camera…");
+      stream?.getTracks().forEach((t) => t.stop());
+      await new Promise((r) => setTimeout(r, 800));
+      if (cancelled) return;
+      try {
+        stream = await openCamera();
+        const v = videoRef.current;
+        v.srcObject = stream;
+        await v.play().catch(() => {});
+        darkTicks = 0;
+      } catch (e) {
+        setCamera(false);
+        setCameraMsg("Could not restart the camera. Close other apps using it, then press Retry camera.");
+      }
+    }
 
     async function loop() {
       const v = videoRef.current;
@@ -70,6 +109,15 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
           setCameraMsg("The camera stopped. Unplug/replug it or allow it again, then press Retry camera.");
           return;
         }
+        if (brightness(v) < 8) {
+          darkTicks += 1;
+          setFaceOk(false);
+          setFaceMsg("The camera picture is black. Check the camera shutter or the laptop's camera key (Fn), and wait a few seconds.");
+          if (darkTicks >= 6 && reopens < 3) await reopenCamera(); // ~5 seconds of black
+          else if (darkTicks >= 6) setCameraMsg("Camera picture stays black. Close other apps using the camera, check the shutter / privacy key, then press Retry camera.");
+          return;
+        }
+        darkTicks = 0;
         const dets = await faceapi.detectAllFaces(v, OPTS);
         if (dets.length === 0) {
           single = 0;
