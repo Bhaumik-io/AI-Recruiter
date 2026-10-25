@@ -11,7 +11,7 @@ const MAX_TRIES = 12; // wrong-face attempts before asking for the invigilator
 // Step between "share screen" and "start exam": proves the camera works, shows ONE
 // clear face, and that it is the same person who enrolled at sign-up. The server
 // remembers the pass (/exam/face-check) and /exam/start refuses without it.
-export default function ExamReadiness({ screenStream, onBegin, beginBusy, error }) {
+export default function ExamReadiness({ screenStream, onBegin, beginBusy, error , cameraStream }) {
   const videoRef = useRef(null);
   const matchedRef = useRef(false);
   const busyRef = useRef(false);
@@ -205,7 +205,10 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
         setCamera(false);
         setCameraMsg("Starting camera…");
         // ask for the camera and download the models at the same time (saves several seconds)
-        const camPromise = openCamera().then(
+        // the camera may already be open (it is opened BEFORE screen sharing starts, which avoids
+        // the black picture some laptops give when both start together)
+        const preLive = cameraStream?.getVideoTracks()[0]?.readyState === "live";
+        const camPromise = (preLive ? Promise.resolve(cameraStream) : openCamera()).then(
           (st) => ({ st }),
           (err) => ({ err })
         );

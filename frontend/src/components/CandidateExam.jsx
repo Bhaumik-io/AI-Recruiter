@@ -44,6 +44,7 @@ export default function CandidateExam() {
   const paperIdRef = useRef(null);
   const submittingRef = useRef(false);
   const screenRef = useRef(null);
+  const camPreRef = useRef(null); // webcam opened before screen sharing
 
   const load = () =>
     examApi
@@ -77,6 +78,14 @@ export default function CandidateExam() {
   async function begin() {
     setGateError("");
     setGateBusy(true);
+    // Open the webcam FIRST and let it warm up, then ask for screen sharing. Opening them the other
+    // way round gives a black camera picture on some laptops.
+    try {
+      camPreRef.current?.getTracks().forEach((t) => t.stop());
+      camPreRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "user" } });
+    } catch {
+      camPreRef.current = null; // the system check explains any camera problem
+    }
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: "monitor" },
@@ -412,6 +421,7 @@ export default function CandidateExam() {
         <ExamReadiness
           key={checkKey}
           screenStream={screenStream}
+          cameraStream={camPreRef.current}
           onBegin={beginExam}
           beginBusy={gateBusy}
           error={checkError}
