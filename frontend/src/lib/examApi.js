@@ -2,7 +2,7 @@
 // ADJUST: TOKEN_KEY must match where your login stores the JWT, and BASE
 // should match how your other API calls reach FastAPI.
 const BASE = import.meta.env.VITE_API_URL || "";
-const CANDIDATE_PATHS = ["/exam/active", "/exam/start", "/exam/face-check", "/exam/save", "/exam/submit"];
+const CANDIDATE_PATHS = ["/exam/active", "/exam/history", "/exam/start", "/exam/face-check", "/exam/save", "/exam/submit"];
 const tokenFor = (path) =>
   localStorage.getItem(CANDIDATE_PATHS.some((p) => path.startsWith(p)) ? "candidate_token" : "hr_token");
 
