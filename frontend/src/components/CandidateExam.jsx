@@ -35,6 +35,7 @@ export default function CandidateExam() {
   const lastSavedRef = useRef("");
   const [questions, setQuestions] = useState([]); // released by the server only after Start
   const [, setTick] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
   const offsetRef = useRef(0); // server clock minus this computer's clock, in ms
 
   // The monitor keeps the callbacks from its first render, so anything it
@@ -234,12 +235,36 @@ export default function CandidateExam() {
     return () => clearInterval(t);
   }, [data?.submission?.status]);
 
+  // "Your exam is submitted" stays until the exam window has closed (everyone is done)
+  // plus 5 minutes, then the page goes back to "No exam is live right now".
+  const SUBMITTED_HOLD_MS = 5 * 60 * 1000;
+  const subRec = data?.submission;
+  const pp = data?.paper;
+  const holdUntil =
+    subRec && pp
+      ? (pp.window_end
+          ? Date.parse(pp.window_end)
+          : Date.parse(subRec.submitted_at || pp.server_now) + pp.duration_minutes * 60000) + SUBMITTED_HOLD_MS
+      : null;
+  const showSubmitted = !!subRec && holdUntil !== null && Date.now() + offsetRef.current < holdUntil;
+
+  useEffect(() => {
+    if (!showSubmitted) return;
+    const wait = holdUntil - (Date.now() + offsetRef.current) + 500;
+    const flip = setTimeout(() => setTick((n) => n + 1), Math.min(wait, 2 ** 31 - 1));
+    const poll = setInterval(load, 20000); // picks up "window closed" and the final marks
+    return () => {
+      clearTimeout(flip);
+      clearInterval(poll);
+    };
+  }, [showSubmitted, holdUntil]);
+
   if (!data)
     return (
       <Page>{error ? <div className={T.error}>{error}</div> : <div className={T.muted}>Loading…</div>}</Page>
     );
 
-  if (!data.paper)
+  if (!data.paper || (data.submission && !showSubmitted))
     return (
       <Page>
         <div className={T.card}>
@@ -247,6 +272,10 @@ export default function CandidateExam() {
           <div className={T.cardTitle}>No exam is live right now.</div>
           <div className={T.muted}>Please check back later.</div>
         </div>
+        <HistoryPanel />
+        <button onClick={logoutCandidate} className={T.btnGhost}>
+          Log out
+        </button>
       </Page>
     );
 
@@ -268,11 +297,16 @@ export default function CandidateExam() {
             ⛔ Your exam was auto-submitted after 3 proctoring warnings. This has been reported to your teacher.
           </div>
         )}
-        {submission.status === "scoring" && <div className={T.info}>Submitted. Your answers are being checked…</div>}
+        <div className={T.card}>
+          <div className="text-2xl font-semibold text-white">✅ Your exam is submitted</div>
+          <div className={T.muted}>
+            You can close this page once everyone has finished. Marks appear here after the exam window closes.
+          </div>
+        </div>
         {submission.status === "score_failed" && (
-          <div className={T.error}>Submitted. Scoring hit a problem; your teacher will review it.</div>
+          <div className={T.error}>Scoring hit a problem; your teacher will review it.</div>
         )}
-        {submission.status === "scored" && (
+        {submission.status === "scored" && submission.total_score != null && (
           <>
             <div className={T.card}>
               <div className={T.muted}>Your score</div>
@@ -294,9 +328,15 @@ export default function CandidateExam() {
             <FeedbackPopup userId={candidateId} />
           </>
         )}
-        <button onClick={logoutCandidate} className={T.btnGhost}>
-          Log out
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowHistory((v) => !v)} className={T.btnGhost}>
+            {showHistory ? "Hide history" : "History"}
+          </button>
+          <button onClick={logoutCandidate} className={T.btnGhost}>
+            Log out
+          </button>
+        </div>
+        {showHistory && <HistoryPanel />}
       </Page>
     );
   }
@@ -523,6 +563,42 @@ export default function CandidateExam() {
 // Must live OUTSIDE CandidateExam: a component defined inside another one gets a
 // new identity on every render, which would remount the webcam monitor and make
 // the answer boxes lose focus every time the timer ticks.
+function HistoryPanel() {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    examApi.history().then((d) => setRows(d.history)).catch((e) => setErr(e.message));
+  }, []);
+  return (
+    <div className={T.card}>
+      <div className={T.eyebrow}>History</div>
+      <div className="mb-2 text-sm font-semibold text-white">Your last 10 exams</div>
+      {err && <div className={T.error}>{err}</div>}
+      {!rows && !err && <div className={T.muted}>Loading…</div>}
+      {rows && rows.length === 0 && <div className={T.muted}>No exams yet.</div>}
+      {rows?.map((r) => (
+        <div key={r.paper_id + r.submitted_at} className="flex items-center justify-between gap-3 border-t border-[#1c2230] py-2 text-xs">
+          <div>
+            <div className="text-white">{r.title}</div>
+            <div className="text-[#6b7385]">
+              {r.subject ? r.subject + " · " : ""}
+              {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : ""}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[#c9962f]">{r.status}</div>
+            {r.total_score != null && (
+              <div className="text-[#8a93a6]">
+                {r.total_score} / {r.max_total}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Page({ children }) {
   return <div className={T.page}>{children}</div>;
 }

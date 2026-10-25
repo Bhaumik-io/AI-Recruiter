@@ -79,6 +79,7 @@ export const examApi = {
   resetStudentPassword: (who, password = "") => req("/exam/students/reset-password", { method: "POST", json: { who, password } }),
   // candidate
   active: () => req("/exam/active"),
+  history: () => req("/exam/history"),
   faceCheck: (descriptor) => req("/exam/face-check", { method: "POST", json: { descriptor } }),
   save: (paper_id, answers) => req("/exam/save", { method: "POST", json: { paper_id, answers } }),
   start: () => req("/exam/start", { method: "POST" }),
