@@ -13,6 +13,8 @@ const verifyFace = (descriptor) => examApi.faceCheck(descriptor).then((r) => r.m
 // mandatory full-screen share + fullscreen gate, then AntiCheatMonitor
 // (webcam face checks, tab / window switches, copy-paste, dev tools...).
 // The 3rd strike auto-submits whatever has been written so far.
+const ALLOW_BACK = true; // set to false to allow forward-only navigation (no going back to earlier questions)
+
 export default function CandidateExam() {
   const { candidateId, logoutCandidate } = useAuth();
   const [data, setData] = useState(null);
@@ -36,6 +38,7 @@ export default function CandidateExam() {
   const [questions, setQuestions] = useState([]); // released by the server only after Start
   const [, setTick] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
+  const [qIndex, setQIndex] = useState(0); // one question on screen at a time
   const offsetRef = useRef(0); // server clock minus this computer's clock, in ms
 
   // The monitor keeps the callbacks from its first render, so anything it
@@ -496,7 +499,7 @@ export default function CandidateExam() {
         </div>
       )}
 
-      {questions.map((q) => (
+      {questions.slice(qIndex, qIndex + 1).map((q) => (
         <div key={q.q_no} className={`${T.card} select-none`}>
           <div className="text-sm font-semibold text-white">
             <span className="text-[#c9962f]">Q{q.q_no}.</span> {q.question}{" "}
@@ -543,16 +546,42 @@ export default function CandidateExam() {
         </div>
       ))}
 
+      {questions.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setQIndex((i) => Math.max(0, i - 1))}
+            disabled={!ALLOW_BACK || qIndex === 0}
+            className={T.btnGhost}
+          >
+            ← Previous
+          </button>
+          <span className="text-xs text-[#8a93a6]">
+            Question {qIndex + 1} of {questions.length} · {questions.filter((x) => (answers[x.q_no] || "").toString().trim()).length} answered
+          </span>
+          {qIndex < questions.length - 1 ? (
+            <button type="button" onClick={() => { setQIndex((i) => i + 1); setConfirming(false); }} className={T.btnGold}>
+              Next →
+            </button>
+          ) : (
+            <span className="w-[88px]" />
+          )}
+        </div>
+      )}
+
       {error && <div className={T.error}>{error}</div>}
 
       {/* in-page confirm: a native confirm() dialog could trigger a window-blur strike */}
-      {!confirming ? (
+      {qIndex < questions.length - 1 ? null : !confirming ? (
         <button onClick={() => setConfirming(true)} disabled={busy} className={T.btnGold}>
           Submit paper
         </button>
       ) : (
         <div className={`${T.sub} flex items-center gap-3`}>
-          <span className="text-xs text-[#cfd3dc]">Submit now? You can't change answers afterwards.</span>
+          <span className="text-xs text-[#cfd3dc]">
+            Submit now? You can't change answers afterwards.
+            {(() => { const n = questions.filter((x) => !(answers[x.q_no] || "").toString().trim()).length; return n ? ` ${n} question(s) are unanswered.` : ""; })()}
+          </span>
           <button onClick={submit} disabled={busy} className={T.btnGold}>
             {busy ? "Submitting…" : "Yes, submit"}
           </button>

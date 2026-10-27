@@ -409,6 +409,14 @@ export default function QuestionGenModule() {
                 <div className={T.success}>
                   Approved. Every candidate who logs in or signs up will now get this paper. Check the “Student reports”
                   tab for results.
+                  <div className="mt-2 flex gap-2">
+                    <button className={T.btnGhost} onClick={() => examApi.downloadQuestions(paper.paper_id, "xlsx").catch((e) => setError(e.message))}>
+                      ⬇ Download questions (Excel)
+                    </button>
+                    <button className={T.btnGhost} onClick={() => examApi.downloadQuestions(paper.paper_id, "csv").catch((e) => setError(e.message))}>
+                      ⬇ CSV
+                    </button>
+                  </div>
                 </div>
               )}
             </section>

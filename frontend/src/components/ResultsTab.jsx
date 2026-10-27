@@ -101,6 +101,7 @@ export default function ResultsTab() {
   return (
     <div className="space-y-5">
       <ResetPassword />
+      <DownloadQuestions paperId={paperId} />
       {error && <div className={T.error}>{error}</div>}
 
       <section className={`${T.card} !space-y-3`}>
@@ -204,6 +205,19 @@ export default function ResultsTab() {
 
       {open && <SheetModal paperId={paperId} cid={open} onClose={() => { setOpen(null); load(); }} />}
     </div>
+  );
+}
+
+function DownloadQuestions({ paperId }) {
+  const [err, setErr] = useState("");
+  const go = (fmt) => examApi.downloadQuestions(paperId, fmt).catch((e) => setErr(e.message));
+  if (!paperId) return null;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button className={T.btnGhost} onClick={() => go("xlsx")}>⬇ Questions (Excel)</button>
+      <button className={T.btnGhost} onClick={() => go("csv")}>⬇ Questions (CSV)</button>
+      {err && <span className="text-xs text-[#f0908a]">{err}</span>}
+    </span>
   );
 }
 

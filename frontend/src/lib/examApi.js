@@ -74,6 +74,23 @@ export const examApi = {
   submission: (id, cid) => req(`/exam/papers/${id}/submissions/${cid}`),
   editScore: (id, cid, q_no, score, note = "") =>
     req(`/exam/papers/${id}/submissions/${cid}/score`, { method: "PUT", json: { q_no, score, note } }),
+  downloadQuestions: async (id, format = "xlsx") => {
+    const res = await fetch(`${BASE}/exam/papers/${id}/export?format=${format}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("hr_token")}` },
+    });
+    if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Download failed");
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const name = (cd.match(/filename="?([^"]+)"?/) || [])[1] || `questions.${format}`;
+    const url = URL.createObjectURL(blob);
+    const el = document.createElement("a");
+    el.href = url;
+    el.download = name;
+    document.body.appendChild(el);
+    el.click();
+    el.remove();
+    URL.revokeObjectURL(url);
+  },
   reattempt: (id, cid) => req(`/exam/papers/${id}/submissions/${cid}/reattempt`, { method: "POST" }),
   resetScore: (id, cid, q_no) =>
     req(`/exam/papers/${id}/submissions/${cid}/score/reset`, { method: "POST", json: { q_no, score: 0 } }),

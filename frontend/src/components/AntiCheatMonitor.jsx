@@ -43,18 +43,18 @@ const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, s
 // fires on the very first detection instead of waiting for a streak.
 // Loosened for real lab use (glancing at the keyboard, a nearby screen, or the teacher should not cost a strike).
 // Ticks are CHECK_INTERVAL_MS (0.5 s) apart: 10 ticks = 5 s without a face, 20 ticks = 10 s of looking away.
-const CONSECUTIVE_MISSES_REQUIRED = 10 // no face
-const LOOKING_AWAY_MISSES_REQUIRED = 20 // looking away
-const MULTI_FACE_MISSES_REQUIRED = 3 // ~1.5 s with a second face
-const LOOKING_AWAY_REPEAT_MS = 20000 // at most one "looking away" strike every 20 s
+const CONSECUTIVE_MISSES_REQUIRED = 16 // no face (~8 s)
+const LOOKING_AWAY_MISSES_REQUIRED = 30 // looking away (~15 s)
+const MULTI_FACE_MISSES_REQUIRED = 4 // ~2 s with a second face
+const LOOKING_AWAY_REPEAT_MS = 30000 // at most one "looking away" strike every 30 s
 
 // Heuristic gaze/head-pose thresholds — NOT true 3D pose estimation,
 // just nose-vs-eye-center offset relative to face box size. Tightened
 // for a strict interview setting: catches looking down at a phone/notes
 // or turning toward a second screen noticeably faster, at the cost of
 // being pickier about "normal" reading posture too.
-const GAZE_HORIZONTAL_THRESHOLD = 0.32 // was 0.15: now needs a clearly turned head, not a glance
-const GAZE_VERTICAL_DOWN_THRESHOLD = 0.4 // was 0.18: looking down at the keyboard is fine
+const GAZE_HORIZONTAL_THRESHOLD = 0.4 // was 0.15: now needs a clearly turned head, not a glance
+const GAZE_VERTICAL_DOWN_THRESHOLD = 0.5 // was 0.18: looking down at the keyboard is fine
 
 function avgPoint(points) {
   const n = points.length

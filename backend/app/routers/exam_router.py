@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
+from fastapi import Response
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
@@ -554,6 +555,62 @@ def hr_reset_student_password(body: ResetPwBody, hr=Depends(get_current_hr)):
     except Exception as e:
         print(f"[reset-password] email failed: {e}")
     return {"email": row.get("email"), "candidate_id": row["id"], "temp_password": temp, "emailed": mailed}
+
+
+def _question_rows(p: dict) -> list[list]:
+    head = ["Q No", "Type", "Chapter", "Topic", "Question", "Option A", "Option B", "Option C", "Option D",
+            "Correct / ideal answer", "Key points", "Marks"]
+    rows = [head]
+    for q in p["questions"]:
+        opts = (q.get("options") or []) + [""] * 4
+        rows.append([
+            q.get("q_no"), q.get("type", ""), q.get("chapter", ""), q.get("topic", ""), q.get("question", ""),
+            opts[0], opts[1], opts[2], opts[3],
+            q.get("reference_answer", ""), "; ".join(q.get("key_points") or []), q.get("marks"),
+        ])
+    return rows
+
+
+@router.get("/papers/{paper_id}/export")
+def export_questions(paper_id: str, format: str = "xlsx", hr=Depends(get_current_hr)):
+    """HR downloads the paper's questions (with answers) as Excel or CSV."""
+    import csv
+    import io
+    import re as _re
+
+    p = st.papers.find_one({"paper_id": paper_id}, st.NO_ID)
+    if not p:
+        raise HTTPException(404, "Paper not found")
+    rows = _question_rows(p)
+    name = _re.sub(r"[^A-Za-z0-9_-]+", "_", p.get("title", "paper"))[:50] or "paper"
+    if format == "xlsx":
+        try:
+            import openpyxl
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Questions"
+            for row in rows:
+                ws.append(["" if v is None else v for v in row])
+            ws.freeze_panes = "A2"
+            buf = io.BytesIO()
+            wb.save(buf)
+            return Response(
+                buf.getvalue(),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{name}_questions.xlsx"'},
+            )
+        except ImportError:
+            pass  # openpyxl not installed: fall back to CSV below
+    buf = io.StringIO()
+    csv.writer(buf).writerows(
+        [[("'" + str(v) if isinstance(v, str) and v[:1] in "=+-@" else v) for v in row] for row in rows]
+    )
+    return Response(
+        "\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{name}_questions.csv"'},
+    )
 
 
 @router.post("/papers/{paper_id}/submissions/{candidate_id}/reattempt")
