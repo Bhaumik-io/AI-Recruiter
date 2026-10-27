@@ -74,6 +74,7 @@ export const examApi = {
   submission: (id, cid) => req(`/exam/papers/${id}/submissions/${cid}`),
   editScore: (id, cid, q_no, score, note = "") =>
     req(`/exam/papers/${id}/submissions/${cid}/score`, { method: "PUT", json: { q_no, score, note } }),
+  reattempt: (id, cid) => req(`/exam/papers/${id}/submissions/${cid}/reattempt`, { method: "POST" }),
   resetScore: (id, cid, q_no) =>
     req(`/exam/papers/${id}/submissions/${cid}/score/reset`, { method: "POST", json: { q_no, score: 0 } }),
   resetStudentPassword: (who, password = "") => req("/exam/students/reset-password", { method: "POST", json: { who, password } }),

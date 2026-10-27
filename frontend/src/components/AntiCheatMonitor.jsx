@@ -41,16 +41,20 @@ const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, s
 // frame (blink, motion blur), but half the reaction time of before.
 // Multiple faces is treated as unambiguous, not a flaky-frame risk, so it
 // fires on the very first detection instead of waiting for a streak.
-const CONSECUTIVE_MISSES_REQUIRED = 4
-const MULTI_FACE_MISSES_REQUIRED = 1
+// Loosened for real lab use (glancing at the keyboard, a nearby screen, or the teacher should not cost a strike).
+// Ticks are CHECK_INTERVAL_MS (0.5 s) apart: 10 ticks = 5 s without a face, 20 ticks = 10 s of looking away.
+const CONSECUTIVE_MISSES_REQUIRED = 10 // no face
+const LOOKING_AWAY_MISSES_REQUIRED = 20 // looking away
+const MULTI_FACE_MISSES_REQUIRED = 3 // ~1.5 s with a second face
+const LOOKING_AWAY_REPEAT_MS = 20000 // at most one "looking away" strike every 20 s
 
 // Heuristic gaze/head-pose thresholds — NOT true 3D pose estimation,
 // just nose-vs-eye-center offset relative to face box size. Tightened
 // for a strict interview setting: catches looking down at a phone/notes
 // or turning toward a second screen noticeably faster, at the cost of
 // being pickier about "normal" reading posture too.
-const GAZE_HORIZONTAL_THRESHOLD = 0.15
-const GAZE_VERTICAL_DOWN_THRESHOLD = 0.18
+const GAZE_HORIZONTAL_THRESHOLD = 0.32 // was 0.15: now needs a clearly turned head, not a glance
+const GAZE_VERTICAL_DOWN_THRESHOLD = 0.4 // was 0.18: looking down at the keyboard is fine
 
 function avgPoint(points) {
   const n = points.length
@@ -102,7 +106,7 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
     // violations of the same kind can still rack up strikes quickly.
     const now = Date.now()
     const last = lastEventAtRef.current[eventType] || 0
-    if (now - last < 5000) return
+    if (now - last < (eventType === 'looking_away' ? LOOKING_AWAY_REPEAT_MS : 5000)) return
     lastEventAtRef.current[eventType] = now
 
     pushWarning(uiText)
@@ -274,7 +278,7 @@ export default function AntiCheatMonitor({ candidateId, onTerminated, screenStre
 
               if (lookingAway) {
                 lookingAwayStreakRef.current += 1
-                if (lookingAwayStreakRef.current >= CONSECUTIVE_MISSES_REQUIRED) {
+                if (lookingAwayStreakRef.current >= LOOKING_AWAY_MISSES_REQUIRED) {
                   report('looking_away', 'warning', 'Looking away from the screen')
                 }
               } else {

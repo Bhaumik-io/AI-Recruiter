@@ -260,7 +260,24 @@ function SheetModal({ paperId, cid, onClose }) {
             )}
             {d?.terminated && <div className="mt-1 text-xs text-[#f0908a]">{d.termination_reason}</div>}
           </div>
-          <button onClick={onClose} className={T.btnGhost}>Close ✕</button>
+          <div className="flex gap-2">
+            <button
+              className={T.btnGhost}
+              onClick={async () => {
+                if (!window.confirm("Let this student take the exam again? Their answers, marks and cheating strikes for this exam will be deleted.")) return;
+                try {
+                  const r = await examApi.reattempt(paperId, cid);
+                  window.alert(r.window_open ? "Done. The student can log in and start again." : "Done, but the exam window is closed, so they cannot start until you reopen/extend it.");
+                  onClose();
+                } catch (e) {
+                  setError(e.message);
+                }
+              }}
+            >
+              Allow re-attempt
+            </button>
+            <button onClick={onClose} className={T.btnGhost}>Close ✕</button>
+          </div>
         </div>
         {error && <div className={T.error}>{error}</div>}
         {!d && !error && <div className={T.muted}>Loading…</div>}

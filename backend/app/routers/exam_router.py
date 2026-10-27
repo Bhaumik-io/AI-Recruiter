@@ -556,6 +556,31 @@ def hr_reset_student_password(body: ResetPwBody, hr=Depends(get_current_hr)):
     return {"email": row.get("email"), "candidate_id": row["id"], "temp_password": temp, "emailed": mailed}
 
 
+@router.post("/papers/{paper_id}/submissions/{candidate_id}/reattempt")
+def hr_allow_reattempt(paper_id: str, candidate_id: str, hr=Depends(get_current_hr)):
+    """HR lets a student take this exam again (for example after a wrongly flagged auto-end).
+    Removes their submission, their start record and the proctoring strikes for this exam, and
+    releases the device lock. The student then goes through the system check and starts a fresh
+    attempt, as long as the exam window is still open."""
+    p = st.papers.find_one({"paper_id": paper_id}, st.NO_ID)
+    if not p:
+        raise HTTPException(404, "Paper not found")
+    key = {"paper_id": paper_id, "candidate_id": candidate_id}
+    removed_sub = st.submissions.delete_one(key).deleted_count
+    removed_start = st.starts.delete_one(key).deleted_count
+    q = {"candidate_id": candidate_id}
+    if p.get("approved_at"):
+        q["created_at"] = {"$gte": p["approved_at"]}
+    strikes = app_storage.get_db().proctoring_events.delete_many(q).deleted_count
+    st.devices.delete_one({"candidate_id": candidate_id})
+    return {
+        "ok": True,
+        "submission_removed": removed_sub,
+        "strikes_removed": strikes,
+        "window_open": _phase(p, _utcnow()) != "closed" and bool(p.get("is_active")),
+    }
+
+
 # ---------------------------------------------------------------- candidate side
 def _bind_device(cid: str, request: Request) -> str:
     """Lock each student to the first browser they use for the exam, and
