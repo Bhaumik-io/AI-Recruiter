@@ -104,7 +104,13 @@ export default function CandidateExam() {
       screenRef.current = stream;
       setScreenStream(stream);
     } catch (e) {
-      setGateError("Screen sharing is required to start the exam: " + (e.message || "permission denied"));
+      const mac = /Mac/i.test(navigator.platform || navigator.userAgent || "");
+      setGateError(
+        "Screen sharing is required to start the exam: " + (e.message || "permission denied") +
+          (mac
+            ? ". On a Mac: open System Settings → Privacy & Security → Screen & System Audio Recording, turn ON your browser (Chrome), then fully quit the browser (Cmd+Q), reopen it and try again."
+            : ""),
+      );
       setGateBusy(false);
       return;
     }

@@ -242,7 +242,7 @@ export default function ExamReadiness({ screenStream, onBegin, beginBusy, error 
         const n = e?.name;
         setCameraMsg(
           n === "NotAllowedError" || n === "SecurityError"
-            ? "Camera permission was blocked. Click the camera icon in the address bar, choose Allow, then press Retry camera."
+            ? "Camera permission was blocked. Click the camera icon in the address bar and choose Allow. On a Mac also check System Settings → Privacy & Security → Camera → turn ON your browser, then press Retry camera."
             : n === "NotReadableError" || n === "TrackStartError"
               ? "The camera is being used by another app or browser tab (Zoom, Meet, Teams, camera app). Close it, then press Retry camera."
               : n === "NotFoundError" || n === "DevicesNotFoundError"
