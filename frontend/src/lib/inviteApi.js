@@ -33,5 +33,8 @@ export const inviteApi = {
   list: () => req("/exam-invites/batches"),
   get: (id) => req(`/exam-invites/batches/${id}`),
   send: (id, body) => req(`/exam-invites/batches/${id}/send`, { method: "POST", json: body }),
+  addStudent: (body) => req("/exam-invites/students", { method: "POST", json: body }),
+  resend: (inviteId) => req(`/exam-invites/invites/${inviteId}/resend`, { method: "POST" }),
+  resetAccount: (inviteId) => req(`/exam-invites/invites/${inviteId}/reset-account`, { method: "POST" }),
   remove: (id) => req(`/exam-invites/batches/${id}`, { method: "DELETE" }),
 };

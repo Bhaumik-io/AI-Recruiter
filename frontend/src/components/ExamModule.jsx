@@ -36,12 +36,32 @@ export default function ExamModule() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState(false);
+  const [adding, setAdding] = useState(false);
   const inputRef = useRef(null);
 
   const loadBatches = () => inviteApi.list().then(setBatches).catch(() => {});
+  // On every visit / refresh, reopen the list you were last working on (or the newest one),
+  // so the student records are always there.
   useEffect(() => {
-    loadBatches();
+    inviteApi
+      .list()
+      .then((l) => {
+        setBatches(l);
+        let saved = "";
+        try {
+          saved = localStorage.getItem("exam_batch_id") || "";
+        } catch {}
+        const id = l.find((b) => b.batch_id === saved)?.batch_id || l[0]?.batch_id;
+        if (id) inviteApi.get(id).then(setBatch).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!batch?.batch_id) return;
+    try {
+      localStorage.setItem("exam_batch_id", batch.batch_id);
+    } catch {}
+  }, [batch?.batch_id]);
 
   // keep refreshing while codes are being delivered
   useEffect(() => {
@@ -87,6 +107,20 @@ export default function ExamModule() {
       setBatch(await inviteApi.send(batch.batch_id, batch.last_send));
     });
 
+  const resendOne = (r) =>
+    run("Sending…", async () => {
+      setBatch(await inviteApi.resend(r.invite_id));
+      loadBatches();
+    });
+
+  const resetAccount = (r) => {
+    if (!window.confirm(`Delete ${r.name || r.email || "this student"}'s account? Their password and face are removed and they can sign up again with the same code. Exam answers already submitted are kept.`)) return;
+    run("Deleting account…", async () => {
+      setBatch(await inviteApi.resetAccount(r.invite_id));
+      loadBatches();
+    });
+  };
+
   const s = batch?.stats;
   const skipped = s ? s.duplicates + s.invalid_email + s.invalid_phone : 0;
 
@@ -100,9 +134,14 @@ export default function ExamModule() {
             Upload your student list, then send every student a one-time access code to sign up for the exam.
           </p>
         </div>
-        <Link to="/hr/dashboard" className={T.btnGhost}>
-          ← Dashboard
-        </Link>
+        <div className="flex gap-2">
+          <button onClick={() => setAdding(true)} className={T.btnGold} title="Add a student manually">
+            ＋ Add student
+          </button>
+          <Link to="/hr/dashboard" className={T.btnGhost}>
+            ← Dashboard
+          </Link>
+        </div>
       </div>
 
       {error && <div className={T.error}>{error}</div>}
@@ -194,6 +233,7 @@ export default function ExamModule() {
                   <th className={T.th}>Phone</th>
                   <th className={T.th}>Code</th>
                   <th className={T.th}>Status</th>
+                  <th className={T.th}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,6 +252,18 @@ export default function ExamModule() {
                         <div className="mt-1 max-w-[14rem] truncate text-[10px] text-[#f0908a]" title={r.error}>
                           {r.error}
                         </div>
+                      )}
+                    </td>
+                    <td className={`${T.td} whitespace-nowrap`}>
+                      {!r.used && r.email && (
+                        <button className={T.btnLink} disabled={!!busy} onClick={() => resendOne(r)}>
+                          {r.status === "sent" ? "Resend" : "Send"}
+                        </button>
+                      )}
+                      {r.used && (
+                        <button className={T.btnDanger} disabled={!!busy} onClick={() => resetAccount(r)} title="Delete this account so the student can sign up again">
+                          Delete account
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -253,6 +305,18 @@ export default function ExamModule() {
         </section>
       )}
 
+      {adding && (
+        <AddStudentDialog
+          batchId={batch?.batch_id}
+          onClose={() => setAdding(false)}
+          onAdded={(view) => {
+            setBatch(view);
+            setAdding(false);
+            loadBatches();
+          }}
+        />
+      )}
+
       {dialog && batch && (
         <SendDialog
           batch={batch}
@@ -264,6 +328,48 @@ export default function ExamModule() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function AddStudentDialog({ batchId, onClose, onAdded }) {
+  const [f, setF] = useState({ name: "", roll: "", email: "", phone: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      onAdded(await inviteApi.addStudent({ ...f, batch_id: batchId || null }));
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className={`${T.card} w-full max-w-md`} onClick={(e) => e.stopPropagation()}>
+        <div>
+          <div className={T.eyebrow}>Add manually</div>
+          <h3 className="text-lg font-semibold text-white">New student</h3>
+          <div className={T.muted}>
+            {batchId ? "Added to the list you have open." : "Added to a “Manual additions” list."} They get their own
+            access code.
+          </div>
+        </div>
+        <input className={T.input} placeholder="Name" value={f.name} onChange={set("name")} />
+        <input className={T.input} placeholder="Roll no" value={f.roll} onChange={set("roll")} />
+        <input className={T.input} placeholder="Email" value={f.email} onChange={set("email")} />
+        <input className={T.input} placeholder="Phone (optional)" value={f.phone} onChange={set("phone")} />
+        {err && <div className={T.error}>{err}</div>}
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className={T.btnGhost}>Cancel</button>
+          <button onClick={save} disabled={busy || (!f.email.trim() && !f.phone.trim())} className={T.btnGold}>
+            {busy ? "Adding…" : "Add student"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
