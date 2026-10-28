@@ -59,6 +59,15 @@ export const examApi = {
       method: "POST",
       json: { syllabus_id, prompt, duration_minutes, ...opts }, // opts: { style, qtype, custom_prompt }
     }),
+  importPaper: (file, { title = "", subject = "", duration = 60, aiRefs = true } = {}) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("title", title);
+    form.append("subject", subject);
+    form.append("duration_minutes", String(duration));
+    form.append("ai_refs", aiRefs ? "true" : "false");
+    return req("/exam/papers/import", { method: "POST", form });
+  },
   listPapers: () => req("/exam/papers"),
   getPaper: (id) => req(`/exam/papers/${id}`),
   savePaper: (id, paper) => req(`/exam/papers/${id}`, { method: "PUT", json: paper }),

@@ -17,6 +17,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app.core import exam_storage as st
 from app.core import gemini_exam_service as gem
+from app.core import question_import as qimp
 from app.core import storage as app_storage  # the existing proctoring events live here
 from app.routers.exam_deps import get_current_candidate, get_current_hr
 
@@ -188,6 +189,57 @@ def generate_paper(body: GenerateBody, hr=Depends(get_current_hr)):
     }
     st.papers.insert_one(dict(doc))
     return doc
+
+
+@router.post("/papers/import")
+def import_paper(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    subject: str = Form(""),
+    duration_minutes: int = Form(60),
+    ai_refs: bool = Form(True),
+    hr=Depends(get_current_hr),
+):
+    """HR uploads a ready-made question paper (CSV / Excel / text) instead of generating one with AI.
+    It becomes a normal DRAFT paper: preview, edit, set the time window and approve as usual."""
+    try:
+        qs = qimp.parse_questions(file.filename or "", file.file.read(qimp.MAX_BYTES + 1))
+    except qimp.ImportError_ as e:
+        raise HTTPException(400, str(e))
+    for q in qs:
+        if q["type"] in ("mcq", "fill"):
+            q["reference_answer"] = _objective_reference(q)
+    # written questions without a model answer: let the AI draft one (HR can edit it in the preview)
+    need = [q for q in qs if q["type"] not in ("mcq", "fill") and not q["reference_answer"]]
+    refs_note = ""
+    if need and ai_refs:
+        try:
+            refs = gem.build_references(subject, need)
+            for q in need:
+                rr = refs.get(q["q_no"], {})
+                q["reference_answer"] = rr.get("reference_answer", "")
+                if not q["key_points"]:
+                    q["key_points"] = rr.get("key_points", [])
+                q["sources"] = rr.get("sources", [])
+        except Exception as e:  # AI unavailable: keep going, HR can type the model answers
+            refs_note = f"AI model answers could not be drafted ({str(e)[:120]}). Add them in the preview."
+    elif need:
+        refs_note = "Written questions have no model answer yet. Add them in the preview before approving."
+    doc = {
+        "paper_id": st.new_id("PAPER"),
+        "syllabus_id": None,
+        "subject": subject.strip(),
+        "title": title.strip() or (file.filename or "Question paper").rsplit(".", 1)[0],
+        "chapters_covered": sorted({q["chapter"] for q in qs if q.get("chapter")}),
+        "duration_minutes": max(1, int(duration_minutes)),
+        "questions": qs,
+        "status": "draft",
+        "is_active": False,
+        "created_at": st.now(),
+        "source": "import",
+    }
+    st.papers.insert_one(dict(doc))
+    return {**doc, "note": refs_note}
 
 
 @router.get("/papers")

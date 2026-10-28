@@ -30,6 +30,37 @@ export default function QuestionGenModule() {
   const [error, setError] = useState("");
   const [approved, setApproved] = useState(false);
   const inputRef = useRef(null);
+  const importRef = useRef(null);
+  const [impFile, setImpFile] = useState(null);
+  const [impTitle, setImpTitle] = useState("");
+  const [impSubject, setImpSubject] = useState("");
+  const [impDuration, setImpDuration] = useState(60);
+  const [impNote, setImpNote] = useState("");
+
+  const importPaper = () =>
+    run("Reading your question file…", async () => {
+      const p = await examApi.importPaper(impFile, { title: impTitle, subject: impSubject, duration: Number(impDuration) });
+      setImpNote(p.note || "");
+      setPaper(p);
+      setApproved(false);
+      setImpFile(null);
+    });
+
+  const downloadTemplate = () => {
+    const rows = [
+      ["Type", "Question", "Option A", "Option B", "Option C", "Option D", "Answer", "Marks", "Chapter", "Topic", "Key points"],
+      ["mcq", "What does IaaS stand for?", "Infrastructure as a Service", "Software as a Service", "Platform as a Service", "None of these", "A", "1", "1", "Service models", ""],
+      ["fill", "The ______ layer provides virtual machines.", "", "", "", "", "IaaS", "1", "1", "Service models", ""],
+      ["short", "Define virtualization.", "", "", "", "", "Creating virtual versions of hardware or OS.", "2", "2", "Virtualization", "hypervisor; virtual machine"],
+      ["long", "Explain task scheduling in cloud computing.", "", "", "", "", "", "5", "3", "Scheduling", "priority; deadlines; load balancing"],
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "question_paper_template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const run = async (label, fn) => {
     setBusy(label);
@@ -117,6 +148,44 @@ export default function QuestionGenModule() {
         <>
           {error && <div className={T.error}>{error}</div>}
           {busy && <div className={T.info}>{busy}</div>}
+
+          {/* Or: upload a ready-made paper */}
+          <section className={T.card}>
+            <h2 className={T.cardTitle}>Have your own questions? Upload them</h2>
+            <div className={T.muted}>
+              Upload a CSV, Excel or text file with your questions (MCQ, fill in the blanks, short and long answers). It
+              opens below as a draft you can edit and approve, no syllabus needed.
+            </div>
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files[0]) setImpFile(e.dataTransfer.files[0]);
+              }}
+              onClick={() => importRef.current?.click()}
+              className={T.drop}
+            >
+              {impFile ? impFile.name : "Drop a .csv / .xlsx / .txt file here or click to browse"}
+              <input ref={importRef} type="file" accept=".csv,.tsv,.xlsx,.xlsm,.txt,.md" hidden onChange={(e) => e.target.files[0] && setImpFile(e.target.files[0])} />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <input className={T.input} placeholder="Paper title (optional)" value={impTitle} onChange={(e) => setImpTitle(e.target.value)} />
+              <input className={T.input} placeholder="Subject (optional)" value={impSubject} onChange={(e) => setImpSubject(e.target.value)} />
+              <input className={T.input} type="number" min="5" placeholder="Minutes" value={impDuration} onChange={(e) => setImpDuration(e.target.value)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <button onClick={downloadTemplate} className={T.btnLink}>⬇ Download CSV template</button>
+              <button disabled={!impFile || !!busy} onClick={importPaper} className={T.btnGold}>
+                Use these questions
+              </button>
+            </div>
+            <div className="text-[11px] leading-relaxed text-[#6b7385]">
+              Text files: separate questions with a blank line. MCQs use A) B) C) D) lines and “Answer: A”. Fill-ins use
+              ______ and “Answer: word”. Add “Marks: 5” if you like. Written answers without a model answer get one
+              drafted by AI, which you can edit.
+            </div>
+            {impNote && <div className={T.info}>{impNote}</div>}
+          </section>
 
           {/* Step 1: documents */}
           <section className={T.card}>
